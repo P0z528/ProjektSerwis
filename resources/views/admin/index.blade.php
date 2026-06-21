@@ -55,12 +55,9 @@
             <div class="tab-content">
 
                 <div class="tab-pane fade show active" id="tab-dashboard" role="tabpanel">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <div>
-                            <h2>Dashboard administratora</h2>
-                            <p class="text-muted">Podgląd statusów napraw, kontrola jakości i metryki serwisu.</p>
-                        </div>
-                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-3 py-2">● System online</span>
+                    <div class="mb-4">
+                        <h2>Dashboard administratora</h2>
+                        <p class="text-muted">Podgląd statusów napraw, kontrola jakości i metryki serwisu.</p>
                     </div>
 
                     <div class="row mb-4">
@@ -164,37 +161,55 @@
                 <div class="tab-pane fade" id="tab-klienci" role="tabpanel">
                     <div class="mb-4">
                         <h2>Klienci</h2>
-                        <p class="text-muted">Zarządzaj danymi klientów serwisu.</p>
+                        <p class="text-muted">Aktywne zlecenia klientów — edycja statusu i usuwanie urządzeń.</p>
                     </div>
 
                     <div class="card shadow-sm border-0 p-3">
                         <table class="table table-hover align-middle">
                             <thead class="table-light text-muted">
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Imię</th>
-                                    <th>Nazwisko</th>
-                                    <th>Telefon</th>
+                                    <th>Zlecenie</th>
+                                    <th>Klient</th>
+                                    <th>Urządzenie</th>
+                                    <th>Nr seryjny</th>
+                                    <th>Status</th>
+                                    <th>Koszt</th>
                                     <th class="text-end">Akcje</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($klienci as $k)
+                                @forelse($zleceniaKlientow as $zl)
                                 <tr>
-                                    <td class="fw-bold">#{{ $k->id }}</td>
-                                    <td>{{ $k->imie }}</td>
-                                    <td>{{ $k->nazwisko }}</td>
-                                    <td class="text-muted">{{ $k->telefon ?? '—' }}</td>
+                                    <td class="fw-bold">#{{ $zl->id_zlecenia }}</td>
+                                    <td>
+                                        <div class="fw-bold">{{ $zl->imie }} {{ $zl->nazwisko }}</div>
+                                        <div class="small text-muted">{{ $zl->telefon ?? '—' }}</div>
+                                    </td>
+                                    <td>{{ $zl->model }}</td>
+                                    <td class="text-muted small">{{ $zl->numer_seryjny }}</td>
+                                    <td><span class="badge bg-secondary bg-opacity-25 text-dark">{{ $zl->status }}</span></td>
+                                    <td class="fw-bold">{{ number_format($zl->koszt, 2) }} PLN</td>
                                     <td class="text-end">
-                                        <button type="button" class="btn btn-sm btn-outline-primary btn-edit-client"
-                                                data-id="{{ $k->id }}"
-                                                data-imie="{{ $k->imie }}"
-                                                data-nazwisko="{{ $k->nazwisko }}"
-                                                data-telefon="{{ $k->telefon }}">Edytuj</button>
+                                        <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
+                                            <button type="button" class="btn btn-sm btn-outline-primary btn-edit-client"
+                                                    data-id="{{ $zl->id_klienta }}"
+                                                    data-imie="{{ $zl->imie }}"
+                                                    data-nazwisko="{{ $zl->nazwisko }}"
+                                                    data-telefon="{{ $zl->telefon }}">Edytuj klienta</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-edit-status"
+                                                    data-id="{{ $zl->id_zlecenia }}"
+                                                    data-status="{{ $zl->status }}"
+                                                    data-model="{{ $zl->model }}">Edytuj status</button>
+                                            <form action="{{ route('admin.deleteOrder', $zl->id_zlecenia) }}" method="POST" class="m-0"
+                                                  onsubmit="return confirm('Na pewno usunąć to zlecenie i powiązane urządzenie? Tej operacji nie można cofnąć.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Usuń</button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 @empty
-                                <tr><td colspan="5" class="text-center py-4 text-muted">Brak klientów w bazie.</td></tr>
+                                <tr><td colspan="7" class="text-center py-4 text-muted">Brak aktywnych zleceń klientów.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -255,9 +270,6 @@
                                             <td>{{ $p->login }}</td>
                                             <td>
                                                 <span class="badge bg-secondary bg-opacity-25 text-dark">{{ $p->rola }}</span>
-                                                @if($p->ostatni_w_roli)
-                                                    <span class="badge bg-warning bg-opacity-25 text-warning ms-1" title="Ostatnia osoba w tej roli — rola zablokowana">🔒 ostatni w roli</span>
-                                                @endif
                                             </td>
                                             <td class="text-end">
                                                 <div class="d-inline-flex gap-2">
@@ -317,6 +329,34 @@
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
           <button type="submit" class="btn btn-danger">✕ Odeślij do poprawki</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{{-- MODAL: Edycja statusu zlecenia --}}
+<div class="modal fade" id="orderStatusModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="orderStatusForm" method="POST" action="">
+        @csrf
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">Edycja statusu zlecenia</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3" id="orderStatusModelText">Zlecenie</p>
+          <label class="small text-muted mb-1">Nowy status</label>
+          <select name="status" id="orderStatusSelect" class="form-select bg-light border-0" required>
+            @foreach($statusyZlecen as $status)
+              <option value="{{ $status }}">{{ $status }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+          <button type="submit" class="btn btn-success">Zapisz status</button>
         </div>
       </form>
     </div>
@@ -385,8 +425,8 @@
             </select>
             {{-- Gdy pracownik jest ostatni w roli, select jest disabled i nie wysyła wartości - wysyłamy ją ukrytym polem --}}
             <input type="hidden" id="empRolaHidden">
-            <div id="empRolaLock" class="text-warning small mt-1 d-none">
-              🔒 To ostatnia osoba w tej roli. Zmiana roli jest zablokowana — możesz zmienić tylko login i hasło.
+            <div id="empRolaLock" class="text-muted small mt-1 d-none">
+              Zmiana roli jest zablokowana. Można zmienić tylko login i hasło.
             </div>
           </div>
         </div>
@@ -443,6 +483,25 @@ document.addEventListener("DOMContentLoaded", function () {
 
         rejectPreset.addEventListener('change', function() {
             if (this.value) rejectReason.value = this.value;
+        });
+    }
+
+    // --- MODAL: Edycja statusu zlecenia ---
+    const orderStatusModalEl = document.getElementById('orderStatusModal');
+    if (orderStatusModalEl) {
+        const orderStatusModal = new bootstrap.Modal(orderStatusModalEl);
+        const orderStatusForm = document.getElementById('orderStatusForm');
+        const orderStatusSelect = document.getElementById('orderStatusSelect');
+
+        document.querySelectorAll('.btn-edit-status').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+                const status = this.dataset.status || 'W kolejce';
+                orderStatusForm.action = `/admin/zlecenie/${id}/status`;
+                document.getElementById('orderStatusModelText').innerText = `Zlecenie #${id} — ${this.dataset.model || ''}`;
+                orderStatusSelect.value = status;
+                orderStatusModal.show();
+            });
         });
     }
 

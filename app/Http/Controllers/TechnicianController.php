@@ -45,9 +45,8 @@ class TechnicianController
         $kpiDoPodjecia = $pula->count();
         $kpiAktywne = $moje->count();
         $kpiBrakCzesci = DB::table('Zlecenia')->where('id_technika', $userId)->where('status', 'Czeka na części')->count();
-        $kpiWQA = DB::table('Zlecenia')->where('status', 'Do kontroli')->count();
 
-        return view('technik.index', compact('pula', 'moje', 'kpiDoPodjecia', 'kpiAktywne', 'kpiBrakCzesci', 'kpiWQA'));
+        return view('technik.index', compact('pula', 'moje', 'kpiDoPodjecia', 'kpiAktywne', 'kpiBrakCzesci'));
     }
 
     public function takeOrder($id) {

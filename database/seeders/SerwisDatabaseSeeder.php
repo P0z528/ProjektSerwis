@@ -4,18 +4,19 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class SerwisDatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Dodawanie Pracowników
+        // 1. Dodawanie Pracowników (hasła hashowane przez bcrypt)
         $pracownicy = [
-            ['login' => 'admin', 'haslo' => 'admin123', 'rola' => 'Admin'],
-            ['login' => 'technik1', 'haslo' => 'tech123', 'rola' => 'Technik'],
-            ['login' => 'technik2', 'haslo' => 'tech123', 'rola' => 'Technik'],
-            ['login' => 'recepcja', 'haslo' => 'rec123', 'rola' => 'Recepcja'],
-            ['login' => 'magazyn', 'haslo' => 'mag123', 'rola' => 'Magazyn'],
+            ['login' => 'admin', 'haslo' => Hash::make('admin123'), 'rola' => 'Admin'],
+            ['login' => 'technik1', 'haslo' => Hash::make('tech123'), 'rola' => 'Technik'],
+            ['login' => 'technik2', 'haslo' => Hash::make('tech123'), 'rola' => 'Technik'],
+            ['login' => 'recepcja', 'haslo' => Hash::make('rec123'), 'rola' => 'Recepcja'],
+            ['login' => 'magazyn', 'haslo' => Hash::make('mag123'), 'rola' => 'Magazyn'],
         ];
         DB::table('Uzytkownicy')->insert($pracownicy);
 

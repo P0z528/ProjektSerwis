@@ -27,9 +27,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/recepcja/terminy', [KalendarzController::class, 'dostepneTerminy']);
     Route::post('/recepcja/odrzuc-koszt/{id}', [ReceptionController::class, 'rejectCost'])->name('recepcja.rejectCost');
     Route::post('/recepcja/zlecenie', [ReceptionController::class, 'storeOrder'])->name('recepcja.storeOrder');
+    Route::get('/recepcja/wydruk/{id}', [ReceptionController::class, 'downloadWydruk'])->name('recepcja.wydruk');
     Route::post('/recepcja/model', [ReceptionController::class, 'storeModel'])->name('recepcja.storeModel');
     Route::post('/recepcja/typ', [ReceptionController::class, 'storeType'])->name('recepcja.storeType');
     Route::post('/recepcja/czesc', [ReceptionController::class, 'storePart'])->name('recepcja.storePart');
+    Route::post('/recepcja/czesc/{id}', [ReceptionController::class, 'updatePart'])->name('recepcja.updatePart');
+    Route::post('/recepcja/czesc/{id}/usun', [ReceptionController::class, 'deletePart'])->name('recepcja.deletePart');
+    Route::get('/api/katalog/{model}', [ReceptionController::class, 'getCatalogByModel']);
     Route::post('/recepcja/wydaj/{id}', [ReceptionController::class, 'releaseDevice'])->name('recepcja.releaseDevice');
 
 
@@ -39,8 +43,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/admin/zatwierdz/{id}', [AdminController::class, 'approve'])->name('admin.approve');
     Route::post('/admin/poprawka/{id}', [AdminController::class, 'reject'])->name('admin.reject');
 
-    // Zarządzanie klientami
+    // Zarządzanie klientami i zleceniami
     Route::post('/admin/klient/{id}', [AdminController::class, 'updateClient'])->name('admin.updateClient');
+    Route::post('/admin/zlecenie/{id}/status', [AdminController::class, 'updateOrderStatus'])->name('admin.updateOrderStatus');
+    Route::post('/admin/zlecenie/{id}/usun', [AdminController::class, 'deleteOrder'])->name('admin.deleteOrder');
 
     // Zarządzanie pracownikami
     Route::post('/admin/pracownik', [AdminController::class, 'storeEmployee'])->name('admin.storeEmployee');

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User; // <-- Zmiana: Używamy teraz modelu User
 
 class AuthController
 {
@@ -13,21 +12,23 @@ class AuthController
     }
 
     public function login(Request $request) {
-        $credentials = $request->validate([
+        $dane = $request->validate([
             'login' => 'required|string',
             'haslo' => 'required|string',
         ]);
 
-        // Używamy modelu User zamiast DB::table
-        $user = User::where('login', $credentials['login'])
-            ->where('haslo', $credentials['haslo'])
-            ->first();
+        // Auth::attempt weryfikuje hasło przez Hash::check (kolumna "haslo" wskazana
+        // w modelu User przez getAuthPassword). Klucz "password" jest wymagany przez
+        // provider Eloquent i jest automatycznie pomijany przy budowaniu zapytania.
+        $credentials = [
+            'login' => $dane['login'],
+            'password' => $dane['haslo'],
+        ];
 
-        if ($user) {
-            // Laravelowe logowanie z użyciem obiektu
-            Auth::login($user);
+        if (Auth::attempt($credentials)) {
+            $request->session()->regenerate();
 
-            return match($user->rola) {
+            return match(Auth::user()->rola) {
                 'Recepcja' => redirect('/recepcja'),
                 'Admin' => redirect('/admin'),
                 'Technik' => redirect('/technik'),
@@ -39,8 +40,10 @@ class AuthController
         return back()->withErrors(['auth' => 'Nieprawidłowy login lub hasło!']);
     }
 
-    public function logout() {
+    public function logout(Request $request) {
         Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
         return redirect('/login');
     }
 }

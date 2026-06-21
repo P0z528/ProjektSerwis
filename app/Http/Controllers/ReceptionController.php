@@ -4,9 +4,32 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class ReceptionController
 {
+    /**
+     * Normalizuje numer kierunkowy: puste -> +48, same cyfry -> dodaje "+".
+     */
+    private function normalizujKierunkowy(?string $wartosc): string
+    {
+        $kierunkowy = str_replace(' ', '', trim((string) $wartosc));
+
+        if ($kierunkowy === '') {
+            return '+48';
+        }
+
+        if (preg_match('/^[0-9]+$/', $kierunkowy)) {
+            return '+' . $kierunkowy;
+        }
+
+        if (!str_starts_with($kierunkowy, '+')) {
+            $kierunkowy = '+' . ltrim($kierunkowy, '+');
+        }
+
+        return $kierunkowy;
+    }
+
     public function index() {
         // Pobranie unikalnych typów urządzeń
         $typy = DB::table('ModeleApple')->distinct()->pluck('typ');
@@ -41,19 +64,33 @@ class ReceptionController
 
     // Dodanie nowego zlecenia
     public function storeOrder(Request $request) {
+        $kierunkowy = $this->normalizujKierunkowy($request->input('kierunkowy'));
+        $request->merge(['kierunkowy' => $kierunkowy]);
+        $czyPolski = in_array($kierunkowy, ['+48'], true);
+
+        $regulaTelefonu = $czyPolski
+            ? ['required', 'regex:/^[0-9]{9}$/']
+            : ['required', 'regex:/^[0-9]{1,15}$/'];
+
         $validated = $request->validate([
-            'imie' => 'required|string',
-            'nazwisko' => 'required|string',
-            'kierunkowy' => 'required|string|max:6',
-            'telefon' => 'required|digits:9',
+            'imie' => 'required|string|max:26',
+            'nazwisko' => 'required|string|max:26',
+            'kierunkowy' => ['required', 'string', 'max:4', 'regex:/^\+[0-9]{1,3}$/'],
+            'telefon' => $regulaTelefonu,
             'typ' => 'required',
             'model' => 'required',
-            'numer_seryjny' => 'required',
+            'numer_seryjny' => 'required|string|max:26',
             'data_naprawy' => 'required|date|after_or_equal:today',
             'czesci' => 'required|array',
             'zdjecia' => 'nullable|array',
             'zdjecia.*' => 'image|mimes:jpeg,png,jpg,webp|max:4096'
-        ], [], [
+        ], [
+            'kierunkowy.regex' => 'Podaj poprawny numer kierunkowy (np. +48).',
+            'kierunkowy.max' => 'Numer kierunkowy może mieć maksymalnie 4 znaki.',
+            'telefon.regex' => $czyPolski
+                ? 'Polski numer telefonu musi mieć dokładnie 9 cyfr.'
+                : 'Numer telefonu może mieć maksymalnie 15 cyfr (tylko cyfry).',
+        ], [
             'data_naprawy' => 'termin naprawy'
         ]);
 
@@ -74,12 +111,23 @@ class ReceptionController
             }
         }
 
+        // Dane wybranych części/usług (potrzebne też do wydruku) - liczone raz, przed transakcją
+        $czesciDane = DB::table('CzesciKatalog as ck')
+            ->join('ModeleApple as m', 'ck.id_modelu', '=', 'm.id')
+            ->where('m.model', $validated['model'])
+            ->whereIn('ck.nazwa_czesci', $validated['czesci'])
+            ->select('ck.nazwa_czesci', 'ck.cena')
+            ->get();
+
+        $koszt = (float) $czesciDane->sum('cena');
+        $telefonPelny = trim($validated['kierunkowy'] . ' ' . $validated['telefon']);
+
         // Przypisujemy wynik całej transakcji do zmiennej $noweZlecenieId
-        $noweZlecenieId = DB::transaction(function() use ($validated, $sciezkiZdjec) {
+        $noweZlecenieId = DB::transaction(function() use ($validated, $sciezkiZdjec, $koszt, $telefonPelny) {
             $kid = DB::table('Klienci')->insertGetId([
                 'imie' => $validated['imie'],
                 'nazwisko' => $validated['nazwisko'],
-                'telefon' => trim($validated['kierunkowy'] . ' ' . $validated['telefon'])
+                'telefon' => $telefonPelny
             ]);
 
             $uid = DB::table('Urzadzenia')->insertGetId([
@@ -88,13 +136,6 @@ class ReceptionController
                 'model' => $validated['model']
             ]);
 
-            $czesciDane = DB::table('CzesciKatalog as ck')
-                ->join('ModeleApple as m', 'ck.id_modelu', '=', 'm.id')
-                ->where('m.model', $validated['model'])
-                ->whereIn('ck.nazwa_czesci', $validated['czesci'])
-                ->get();
-
-            $koszt = $czesciDane->sum('cena');
             $opis = "Wymiana/Usługa: " . implode(', ', $validated['czesci']);
 
             $zlecenieId = DB::table('Zlecenia')->insertGetId([
@@ -119,8 +160,81 @@ class ReceptionController
             return $zlecenieId;
         });
 
-        // Wyrzucamy na ekran zielony komunikat z nowym numerem zlecenia
-        return back()->with('success', 'Zlecenie przyjęte pomyślnie! Numer zlecenia dla klienta: #' . $noweZlecenieId);
+        // Generujemy i zapisujemy plik wydruku zlecenia na serwerze
+        $this->zapiszWydrukZlecenia($noweZlecenieId, [
+            'imie' => $validated['imie'],
+            'nazwisko' => $validated['nazwisko'],
+            'telefon' => $telefonPelny,
+            'typ' => $validated['typ'],
+            'model' => $validated['model'],
+            'numer_seryjny' => $validated['numer_seryjny'],
+            'data_naprawy' => $validated['data_naprawy'],
+            'czesci' => $czesciDane,
+            'koszt' => $koszt,
+        ]);
+
+        // Komunikat sukcesu + dane do modala potwierdzenia z przyciskiem wydruku
+        return back()
+            ->with('success', 'Zlecenie przyjęte pomyślnie! Numer zlecenia dla klienta: #' . $noweZlecenieId)
+            ->with('nowe_zlecenie', [
+                'id' => $noweZlecenieId,
+                'numer_seryjny' => $validated['numer_seryjny'],
+            ]);
+    }
+
+    /**
+     * Buduje treść szablonu zlecenia i zapisuje go jako plik .txt
+     * w storage/app/public/wydruki/Zlecenie_{ID}.txt
+     */
+    private function zapiszWydrukZlecenia(int $id, array $dane): void
+    {
+        $linie = [];
+        $linie[] = '====================================';
+        $linie[] = '        ELECTROSERVICE - ZLECENIE';
+        $linie[] = '====================================';
+        $linie[] = 'Numer zlecenia : #' . $id;
+        $linie[] = 'Data przyjęcia : ' . now()->format('Y-m-d H:i');
+        $linie[] = 'Termin naprawy : ' . $dane['data_naprawy'];
+        $linie[] = '------------------------------------';
+        $linie[] = 'KLIENT';
+        $linie[] = '  Imię i nazwisko : ' . $dane['imie'] . ' ' . $dane['nazwisko'];
+        $linie[] = '  Telefon         : ' . $dane['telefon'];
+        $linie[] = '------------------------------------';
+        $linie[] = 'URZĄDZENIE';
+        $linie[] = '  Typ          : ' . $dane['typ'];
+        $linie[] = '  Model        : ' . $dane['model'];
+        $linie[] = '  Numer seryjny: ' . $dane['numer_seryjny'];
+        $linie[] = '------------------------------------';
+        $linie[] = 'USŁUGI / CZĘŚCI';
+        foreach ($dane['czesci'] as $czesc) {
+            $linie[] = '  - ' . $czesc->nazwa_czesci . ' : ' . number_format((float) $czesc->cena, 2) . ' PLN';
+        }
+        $linie[] = '------------------------------------';
+        $linie[] = 'KOSZT CAŁKOWITY : ' . number_format($dane['koszt'], 2) . ' PLN';
+        $linie[] = '====================================';
+        $linie[] = 'Dziękujemy za skorzystanie z naszych usług.';
+
+        $tresc = implode("\r\n", $linie);
+
+        Storage::disk('public')->put('wydruki/Zlecenie_' . $id . '.txt', $tresc);
+    }
+
+    /**
+     * Zwraca zapisany plik wydruku zlecenia do pobrania.
+     */
+    public function downloadWydruk($id)
+    {
+        $sciezka = 'wydruki/Zlecenie_' . (int) $id . '.txt';
+
+        if (!Storage::disk('public')->exists($sciezka)) {
+            return back()->with('error', 'Nie znaleziono pliku wydruku dla tego zlecenia.');
+        }
+
+        return response()->download(
+            Storage::disk('public')->path($sciezka),
+            'Zlecenie_' . (int) $id . '.txt',
+            ['Content-Type' => 'text/plain; charset=UTF-8']
+        );
     }
 
     public function storeModel(Request $request) {
@@ -173,11 +287,15 @@ class ReceptionController
 
         if (!$model) return back()->with('error', 'Wybrany model nie istnieje.');
 
-        // Sprawdź czy taka część/usługa już istnieje dla tego modelu
+        // Walidacja duplikatów odporna na wielkość liter i polskie znaki diakrytyczne.
+        // Porównujemy znormalizowane (mb_strtolower) nazwy w PHP, bo SQLite nie obsługuje
+        // natywnie case-insensitive dla znaków Unicode (np. "Słuchawki" == "SŁUCHAWKI").
+        $szukana = mb_strtolower(trim($request->nazwa_czesci), 'UTF-8');
+
         $istniejaca = DB::table('CzesciKatalog')
             ->where('id_modelu', $model->id)
-            ->where('nazwa_czesci', $request->nazwa_czesci)
-            ->first();
+            ->get()
+            ->first(fn ($poz) => mb_strtolower(trim($poz->nazwa_czesci), 'UTF-8') === $szukana);
 
         if ($istniejaca) {
             // Jeśli istnieje, ale użytkownik jeszcze nie potwierdził nadpisania
@@ -204,6 +322,55 @@ class ReceptionController
         ]);
 
         return back()->with('success', 'Dodano nową pozycję do katalogu!');
+    }
+
+    // API: pełna lista pozycji cennika dla modelu (z ID - do edycji/usuwania)
+    public function getCatalogByModel($model) {
+        $pozycje = DB::table('CzesciKatalog as ck')
+            ->join('ModeleApple as m', 'ck.id_modelu', '=', 'm.id')
+            ->where('m.model', $model)
+            ->orderBy('ck.typ')
+            ->orderBy('ck.nazwa_czesci')
+            ->select('ck.id', 'ck.nazwa_czesci', 'ck.cena', 'ck.typ')
+            ->get();
+        return response()->json($pozycje);
+    }
+
+    // Edycja ceny (i typu) istniejącej pozycji cennika
+    public function updatePart(Request $request, $id) {
+        $request->validate([
+            'cena' => 'required|numeric|min:0',
+            'typ_pozycji' => 'required|in:Część,Usługa',
+        ]);
+
+        $pozycja = DB::table('CzesciKatalog')->where('id', $id)->first();
+        if (!$pozycja) {
+            return back()->with('error', 'Nie znaleziono pozycji cennika.');
+        }
+
+        DB::table('CzesciKatalog')->where('id', $id)->update([
+            'cena' => $request->cena,
+            'typ' => $request->typ_pozycji,
+        ]);
+
+        return back()->with('success', 'Zaktualizowano pozycję cennika.');
+    }
+
+    // Usunięcie pozycji cennika
+    public function deletePart($id) {
+        $pozycja = DB::table('CzesciKatalog')->where('id', $id)->first();
+        if (!$pozycja) {
+            return back()->with('error', 'Nie znaleziono pozycji cennika.');
+        }
+
+        DB::transaction(function () use ($id) {
+            // Usuwamy też powiązane stany magazynowe i zapotrzebowania, by nie zostały "sieroty"
+            DB::table('Zapotrzebowania')->where('id_czesci_katalog', $id)->delete();
+            DB::table('Czesci')->where('id_czesci_katalog', $id)->delete();
+            DB::table('CzesciKatalog')->where('id', $id)->delete();
+        });
+
+        return back()->with('success', 'Usunięto pozycję z cennika.');
     }
 
     public function storeType(Request $request) {
@@ -257,19 +424,20 @@ class ReceptionController
 
     public function checkOrderStatus(Request $request) {
         $nrZlecenia = $request->query('zlecenie');
-        $telefon = $request->query('telefon');
+        $numerSeryjny = trim((string) $request->query('numer_seryjny'));
 
-        if (!$nrZlecenia || !$telefon) {
-            return response()->json(['success' => false, 'message' => 'Podaj numer zlecenia i numer telefonu.']);
+        if (!$nrZlecenia || $numerSeryjny === '') {
+            return response()->json(['success' => false, 'message' => 'Podaj numer zlecenia oraz numer seryjny.']);
         }
 
-        // Szukamy konkretnego zlecenia i sprawdzamy, czy telefon klienta pasuje
+        // Szukamy zlecenia po jego numerze (ID) oraz numerze seryjnym urządzenia.
+        // Numer seryjny porównujemy bez względu na wielkość liter.
         $zlecenie = DB::table('Zlecenia as Z')
             ->join('Urzadzenia as U', 'Z.id_urzadzenia', '=', 'U.id')
             ->join('Klienci as K', 'U.id_klienta', '=', 'K.id')
             ->where('Z.id', $nrZlecenia)
-            ->where('K.telefon', 'LIKE', '%' . trim($telefon) . '%') // Zabezpieczenie na wypadek prefiksów np. +48
-            ->select('Z.id as id_zlecenia', 'U.model', 'U.numer_seryjny', 'Z.status', 'Z.koszt')
+            ->whereRaw('LOWER(U.numer_seryjny) = ?', [mb_strtolower($numerSeryjny, 'UTF-8')])
+            ->select('Z.id as id_zlecenia', 'K.imie', 'K.nazwisko', 'U.model', 'U.numer_seryjny', 'Z.status', 'Z.koszt')
             ->first();
 
         if ($zlecenie) {
@@ -277,6 +445,6 @@ class ReceptionController
             return response()->json(['success' => true, 'data' => [$zlecenie]]);
         }
 
-        return response()->json(['success' => false, 'message' => 'Brak wyników. Sprawdź numer zlecenia i podany telefon.']);
+        return response()->json(['success' => false, 'message' => 'Brak wyników. Sprawdź numer zlecenia oraz numer seryjny.']);
     }
 }

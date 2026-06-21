@@ -60,7 +60,7 @@
             @if(session('error')) <div class="alert alert-danger alert-dismissible"><button class="btn-close" data-bs-dismiss="alert"></button>{{ session('error') }}</div> @endif
 
             <div class="mb-4">
-                <h2>Magazyn — gospodarka materiałowa</h2>
+                <h2>Magazyn</h2>
                 <p class="text-muted">Obsługa zapotrzebowań od techników, lista zakupów i stany magazynowe.</p>
             </div>
 

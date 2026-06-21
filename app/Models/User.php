@@ -23,4 +23,13 @@ class User extends Authenticatable
     protected $hidden = [
         'haslo',
     ];
+
+    /**
+     * Hasło uwierzytelniania trzymamy w kolumnie "haslo" (nie domyślnej "password").
+     * Dzięki temu Auth::attempt() oraz weryfikacja Hash::check() działają poprawnie.
+     */
+    public function getAuthPassword()
+    {
+        return $this->haslo;
+    }
 }

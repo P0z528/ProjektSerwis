@@ -35,22 +35,19 @@
             @if(session('warning')) <div class="alert alert-warning alert-dismissible"><button class="btn-close" data-bs-dismiss="alert"></button>{{ session('warning') }}</div> @endif
 
             <div class="mb-4">
-                <h2>Warsztat — panel technika</h2>
+                <h2>Warsztat</h2>
                 <p class="text-muted">Wspólna pula zleceń i Twoje aktywne naprawy.</p>
             </div>
 
             <div class="row mb-4">
-                <div class="col-md-3"><div class="card shadow-sm border-0 border-top border-purple border-3"><div class="card-body">
+                <div class="col-md-4"><div class="card shadow-sm border-0 border-top border-purple border-3"><div class="card-body">
                     <h6 class="text-muted">Do podjęcia</h6><h3 class="fw-bold">{{ $kpiDoPodjecia }}</h3>
                 </div></div></div>
-                <div class="col-md-3"><div class="card shadow-sm border-0 border-top border-primary border-3"><div class="card-body">
+                <div class="col-md-4"><div class="card shadow-sm border-0 border-top border-primary border-3"><div class="card-body">
                     <h6 class="text-muted">Moje aktywne</h6><h3 class="fw-bold">{{ $kpiAktywne }}</h3>
                 </div></div></div>
-                <div class="col-md-3"><div class="card shadow-sm border-0 border-top border-warning border-3"><div class="card-body">
+                <div class="col-md-4"><div class="card shadow-sm border-0 border-top border-warning border-3"><div class="card-body">
                     <h6 class="text-muted">Brak części</h6><h3 class="fw-bold">{{ $kpiBrakCzesci }}</h3>
-                </div></div></div>
-                <div class="col-md-3"><div class="card shadow-sm border-0 border-top border-success border-3"><div class="card-body">
-                    <h6 class="text-muted">W QA</h6><h3 class="fw-bold">{{ $kpiWQA }}</h3>
                 </div></div></div>
             </div>
 

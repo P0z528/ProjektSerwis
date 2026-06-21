@@ -4,11 +4,26 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class AdminController
 {
     // Role, których system wymaga w minimum 1 egzemplarzu
     private const WYMAGANE_ROLE = ['Admin', 'Technik', 'Magazyn', 'Recepcja'];
+
+    /** Dozwolone statusy zlecenia (edycja ręczna w panelu admina). */
+    private const STATUSY_ZLECEN = [
+        'W kolejce',
+        'Przyjęte',
+        'W naprawie',
+        'Czeka na części',
+        'Części dostępne',
+        'Do kontroli',
+        'Poprawka (Priorytet)',
+        'Gotowe',
+        'Wydane',
+    ];
 
     /**
      * Sprawdza, czy dany pracownik jest OSTATNIM przedstawicielem swojej roli.
@@ -59,16 +74,26 @@ class AdminController
             ->where('Z.status', 'Do kontroli')
             ->get();
 
-        // 5. Lista klientów do edycji - TYLKO ci z przynajmniej jednym AKTYWNYM zleceniem
-        //    (zlecenie inne niż 'Wydane' / 'Gotowe'). Klienci bez zleceń lub tylko z historią są pomijani.
-        $klienci = DB::table('Klienci as K')
-            ->join('Urzadzenia as U', 'U.id_klienta', '=', 'K.id')
-            ->join('Zlecenia as Z', 'Z.id_urzadzenia', '=', 'U.id')
+        // 5. Aktywne zlecenia klientów (widok Klienci — z urządzeniami i akcjami)
+        $zleceniaKlientow = DB::table('Zlecenia as Z')
+            ->join('Urzadzenia as U', 'Z.id_urzadzenia', '=', 'U.id')
+            ->join('Klienci as K', 'U.id_klienta', '=', 'K.id')
             ->whereNotIn('Z.status', ['Wydane', 'Gotowe'])
-            ->select('K.id', 'K.imie', 'K.nazwisko', 'K.telefon')
-            ->distinct()
+            ->select(
+                'Z.id as id_zlecenia',
+                'Z.status',
+                'Z.koszt',
+                'U.id as id_urzadzenia',
+                'U.model',
+                'U.numer_seryjny',
+                'K.id as id_klienta',
+                'K.imie',
+                'K.nazwisko',
+                'K.telefon'
+            )
             ->orderBy('K.nazwisko')
             ->orderBy('K.imie')
+            ->orderByDesc('Z.id')
             ->get();
 
         // 6. Lista pracowników (zarządzanie kontami) + flaga "ostatni w roli"
@@ -82,10 +107,12 @@ class AdminController
             $p->ostatni_w_roli = ((int) ($liczbaWRoli[$p->rola] ?? 0)) <= 1;
         }
 
+        $statusyZlecen = self::STATUSY_ZLECEN;
+
         return view('admin.index', compact(
             'aktywne', 'wNaprawie', 'doWydania', 'przychod',
             'donutLabels', 'donutData', 'barLabels', 'barData',
-            'doKontroli', 'klienci', 'pracownicy'
+            'doKontroli', 'zleceniaKlientow', 'pracownicy', 'statusyZlecen'
         ));
     }
 
@@ -125,6 +152,44 @@ class AdminController
         return back()->with('success', 'Dane klienta zostały zaktualizowane.');
     }
 
+    public function updateOrderStatus(Request $request, $id) {
+        $request->validate([
+            'status' => ['required', Rule::in(self::STATUSY_ZLECEN)],
+        ]);
+
+        $zlecenie = DB::table('Zlecenia')->where('id', $id)->first();
+        if (!$zlecenie) {
+            return back()->with('error', 'Nie znaleziono zlecenia.');
+        }
+
+        DB::table('Zlecenia')->where('id', $id)->update(['status' => $request->status]);
+
+        return back()->with('success', 'Zaktualizowano status zlecenia #' . $id . '.');
+    }
+
+    public function deleteOrder($id) {
+        $zlecenie = DB::table('Zlecenia')->where('id', $id)->first();
+        if (!$zlecenie) {
+            return back()->with('error', 'Nie znaleziono zlecenia.');
+        }
+
+        DB::transaction(function () use ($zlecenie) {
+            DB::table('Zapotrzebowania')->where('id_zlecenia', $zlecenie->id)->delete();
+            DB::table('ZdjeciaZlecen')->where('id_zlecenia', $zlecenie->id)->delete();
+            DB::table('Zlecenia')->where('id', $zlecenie->id)->delete();
+
+            $pozostaleZlecenia = DB::table('Zlecenia')
+                ->where('id_urzadzenia', $zlecenie->id_urzadzenia)
+                ->count();
+
+            if ($pozostaleZlecenia === 0) {
+                DB::table('Urzadzenia')->where('id', $zlecenie->id_urzadzenia)->delete();
+            }
+        });
+
+        return back()->with('success', 'Zlecenie i powiązane dane zostały usunięte.');
+    }
+
     // --- ZARZĄDZANIE PRACOWNIKAMI ---
     public function storeEmployee(Request $request) {
         $request->validate([
@@ -137,7 +202,7 @@ class AdminController
 
         DB::table('Uzytkownicy')->insert([
             'login' => $request->login,
-            'haslo' => $request->haslo,
+            'haslo' => Hash::make($request->haslo),
             'rola' => $request->rola,
         ]);
 
@@ -158,7 +223,7 @@ class AdminController
 
         // ŻELAZNA ZASADA: nie można zmienić roli ostatniej osoby na danym stanowisku
         if ($pracownik->rola !== $request->rola && $this->czyOstatniWRoli($pracownik->rola)) {
-            return back()->with('error', "Nie można zmienić roli ostatniego pracownika na stanowisku: {$pracownik->rola}. System wymaga minimum jednej osoby w tej roli.");
+            return back()->with('error', 'Nie można zmienić roli ostatniego pracownika w tej roli.');
         }
 
         $dane = [
@@ -167,7 +232,7 @@ class AdminController
         ];
         // Hasło zmieniamy tylko jeśli zostało podane
         if ($request->filled('haslo')) {
-            $dane['haslo'] = $request->haslo;
+            $dane['haslo'] = Hash::make($request->haslo);
         }
 
         DB::table('Uzytkownicy')->where('id', $id)->update($dane);
@@ -183,37 +248,18 @@ class AdminController
 
         // ŻELAZNA ZASADA: w systemie musi pozostać min. 1 osoba w każdej roli
         if ($this->czyOstatniWRoli($pracownik->rola)) {
-            return back()->with('error', "Nie można usunąć ostatniego pracownika na stanowisku: {$pracownik->rola}. System wymaga minimum jednej osoby w tej roli.");
+            return back()->with('error', 'Nie można usunąć ostatniego pracownika w tej roli.');
         }
 
         DB::transaction(function () use ($id, $pracownik) {
-            // FIX "sierocych" zleceń: jeśli usuwamy technika, jego niezakończone zlecenia
-            // NIE mogą zniknąć - odpinamy je (id_technika = NULL) i przywracamy do obiegu.
             if ($pracownik->rola === 'Technik') {
-                $notatka = ' [SYSTEM] Poprzedni technik został usunięty z systemu. Zlecenie wymaga przypisania nowego technika.';
-
-                $zlecenia = DB::table('Zlecenia')
+                // WSZYSTKIE zlecenia technika wracają do wspólnej puli — bez wyjątków statusu.
+                DB::table('Zlecenia')
                     ->where('id_technika', $id)
-                    ->whereNotIn('status', ['Wydane', 'Gotowe'])
-                    ->get();
-
-                foreach ($zlecenia as $z) {
-                    // Mapowanie statusów powracających zleceń:
-                    // a) "W naprawie" -> z powrotem do ogólnej puli "W kolejce"
-                    // b) "Czeka na części" -> status zostaje (czekamy na dostawę)
-                    // c) "Części dostępne" -> status zostaje (części już są)
-                    // Pozostałe aktywne stany na warsztacie (np. "Poprawka (Priorytet)") również wracają do puli.
-                    $nowyStatus = $z->status;
-                    if (in_array($z->status, ['W naprawie', 'Poprawka (Priorytet)'])) {
-                        $nowyStatus = 'W kolejce';
-                    }
-
-                    DB::table('Zlecenia')->where('id', $z->id)->update([
+                    ->update([
                         'id_technika' => null,
-                        'status' => $nowyStatus,
-                        'opis_usterki' => trim(($z->opis_usterki ?? '') . $notatka),
+                        'status' => 'W kolejce',
                     ]);
-                }
             }
 
             DB::table('Uzytkownicy')->where('id', $id)->delete();

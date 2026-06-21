@@ -10,6 +10,32 @@ document.addEventListener("DOMContentLoaded", function () {
         return str.replace(/"/g, '&quot;');
     }
 
+    // --- NORMALIZACJA NUMERU KIERUNKOWEGO ---
+    function normalizujKierunkowy(wartosc) {
+        let k = (wartosc || '').replace(/\s/g, '').trim();
+        if (k === '') return '+48';
+        if (/^[0-9]+$/.test(k)) return '+' + k;
+        if (!k.startsWith('+')) k = '+' + k.replace(/^\+*/, '');
+        return k;
+    }
+
+    const inputKierunkowy = document.getElementById('input-kierunkowy');
+    const formZlecenie = document.getElementById('form-zlecenie');
+
+    if (inputKierunkowy) {
+        inputKierunkowy.addEventListener('blur', function () {
+            this.value = normalizujKierunkowy(this.value);
+        });
+    }
+
+    if (formZlecenie) {
+        formZlecenie.addEventListener('submit', function () {
+            if (inputKierunkowy) {
+                inputKierunkowy.value = normalizujKierunkowy(inputKierunkowy.value);
+            }
+        });
+    }
+
     // --- OBSŁUGA ZAKŁADEK I ZAPAMIĘTYWANIE (LOCAL STORAGE) ---
     const tabButtons = document.querySelectorAll('#v-pills-tab button');
 
@@ -134,7 +160,7 @@ document.addEventListener("DOMContentLoaded", function () {
         document.querySelector('input[name="numer_seryjny"]').value = "";
         const terminEl = document.getElementById("select-termin");
         if (terminEl) terminEl.value = "";
-        const kierunkowyEl = document.querySelector('select[name="kierunkowy"]');
+        const kierunkowyEl = document.querySelector('input[name="kierunkowy"]');
         if (kierunkowyEl) kierunkowyEl.value = "+48";
         selectTyp.value = "";
 
@@ -234,33 +260,35 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- SPRAWDZANIE STATUSU ZLECENIA ---
     const btnCheckStatus = document.getElementById('btn-check-status');
     const inputZlecenie = document.getElementById('status-zlecenie');
-    const inputTelefon = document.getElementById('status-telefon');
+    const inputNumerSeryjny = document.getElementById('status-numer-seryjny');
     const statusResult = document.getElementById('status-result');
 
     if (btnCheckStatus) {
         btnCheckStatus.addEventListener('click', function() {
             const nrZlecenia = inputZlecenie.value.trim();
-            const telefon = inputTelefon.value.trim();
+            const numerSeryjny = inputNumerSeryjny.value.trim();
 
-            if (!nrZlecenia || !telefon) {
+            if (!nrZlecenia || !numerSeryjny) {
                 statusResult.classList.remove('d-none');
-                statusResult.innerHTML = '<div class="text-danger small fw-bold">✕ Podaj numer zlecenia i telefon.</div>';
+                statusResult.innerHTML = '<div class="text-danger small fw-bold">Podaj numer zlecenia oraz numer seryjny.</div>';
                 return;
             }
 
             statusResult.classList.remove('d-none');
             statusResult.innerHTML = '<div class="text-center text-muted"><div class="spinner-border spinner-border-sm"></div> Szukam...</div>';
 
-            const url = `/api/recepcja/status-naprawy?zlecenie=${encodeURIComponent(nrZlecenia)}&telefon=${encodeURIComponent(telefon)}`;
+            const url = `/api/recepcja/status-naprawy?zlecenie=${encodeURIComponent(nrZlecenia)}&numer_seryjny=${encodeURIComponent(numerSeryjny)}`;
 
             fetch(url)
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
                         const s = data.data[0];
+                        const wlasciciel = (s.imie && s.nazwisko) ? `${s.imie} ${s.nazwisko}` : '—';
                         let html = `
-                            <div class="fw-bold mb-2 text-success">✓ Znaleziono zlecenie #${s.id_zlecenia}</div>
+                            <div class="fw-bold mb-2 text-success">Znaleziono zlecenie #${s.id_zlecenia}</div>
                             <div class="border-top border-light pt-2 mt-2">
+                                <div class="small text-muted mb-1">Właściciel: <span class="fw-bold text-dark">${wlasciciel}</span></div>
                                 <div class="fw-bold text-dark">${s.model} <span class="small text-muted">(SN: ${s.numer_seryjny})</span></div>
                                 <div class="d-flex justify-content-between align-items-center mt-2">
                                     <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1">${s.status}</span>
@@ -338,6 +366,96 @@ document.addEventListener("DOMContentLoaded", function () {
             const dataTransfer = new DataTransfer();
             skompresowane.forEach(f => dataTransfer.items.add(f));
             inputZdjecia.files = dataTransfer.files;
+        });
+    }
+
+    // --- MODAL POTWIERDZENIA ZLECENIA (po dodaniu nowego zlecenia) ---
+    const zlecenieModalEl = document.getElementById('zlecenieModal');
+    if (zlecenieModalEl) {
+        new bootstrap.Modal(zlecenieModalEl).show();
+    }
+
+    // --- EDYCJA / USUWANIE POZYCJI CENNIKA ---
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const editTyp = document.getElementById('edit-katalog-typ');
+    const editModel = document.getElementById('edit-katalog-model');
+    const listaPozycji = document.getElementById('lista-pozycji-cennika');
+
+    function escapeAttr(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function renderPusto(text) {
+        listaPozycji.innerHTML = `<tr><td colspan="3" class="text-center text-muted small py-3">${text}</td></tr>`;
+    }
+
+    if (editTyp && editModel && listaPozycji) {
+        // Typ -> modele
+        editTyp.addEventListener('change', function () {
+            const typ = this.value;
+            renderPusto('Wybierz model, aby wyświetlić pozycje cennika.');
+            if (!typ) {
+                editModel.innerHTML = '<option value="">Najpierw wybierz typ...</option>';
+                editModel.disabled = true;
+                return;
+            }
+            fetch(`/api/modele/${encodeURIComponent(typ)}`)
+                .then(res => res.json())
+                .then(data => {
+                    editModel.innerHTML = '<option value="">Wybierz model...</option>';
+                    data.forEach(model => {
+                        editModel.innerHTML += `<option value="${escapeAttr(model)}">${model}</option>`;
+                    });
+                    editModel.disabled = false;
+                });
+        });
+
+        // Model -> pozycje cennika
+        editModel.addEventListener('change', function () {
+            const model = this.value;
+            if (!model) {
+                renderPusto('Wybierz model, aby wyświetlić pozycje cennika.');
+                return;
+            }
+            listaPozycji.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm"></div> Ładowanie...</td></tr>';
+
+            fetch(`/api/katalog/${encodeURIComponent(model)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.length) {
+                        renderPusto('Brak pozycji cennika dla tego modelu.');
+                        return;
+                    }
+                    listaPozycji.innerHTML = '';
+                    data.forEach(poz => {
+                        const cena = parseFloat(poz.cena).toFixed(2);
+                        const czescSel = poz.typ === 'Część' ? 'selected' : '';
+                        const uslugaSel = poz.typ === 'Usługa' ? 'selected' : '';
+                        listaPozycji.innerHTML += `
+                            <tr>
+                                <td class="small">${poz.nazwa_czesci}</td>
+                                <td>
+                                    <form action="/recepcja/czesc/${poz.id}" method="POST" class="d-flex gap-1 m-0 align-items-center">
+                                        <input type="hidden" name="_token" value="${csrfToken}">
+                                        <input type="number" step="0.01" min="0" name="cena" value="${cena}" class="form-control form-control-sm bg-light border" style="max-width: 110px;" required>
+                                        <select name="typ_pozycji" class="form-select form-select-sm bg-light border" style="max-width: 110px;">
+                                            <option value="Część" ${czescSel}>Część</option>
+                                            <option value="Usługa" ${uslugaSel}>Usługa</option>
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-success py-1 px-2">Zapisz</button>
+                                    </form>
+                                </td>
+                                <td class="text-end">
+                                    <form action="/recepcja/czesc/${poz.id}/usun" method="POST" class="m-0" onsubmit="return confirm('Na pewno usunąć tę pozycję z cennika?');">
+                                        <input type="hidden" name="_token" value="${csrfToken}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2">Usuń</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                })
+                .catch(() => renderPusto('Błąd ładowania pozycji cennika.'));
         });
     }
 });

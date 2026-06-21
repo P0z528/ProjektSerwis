@@ -68,25 +68,22 @@
                                     <div class="row mb-4">
                                         <div class="col-md-4">
                                             <label class="small text-muted mb-1">Imię</label>
-                                            <input type="text" name="imie" class="form-control bg-light border-0 @error('imie') is-invalid @enderror" value="{{ old('imie') }}" required>
+                                            <input type="text" name="imie" maxlength="26" class="form-control bg-light border-0 @error('imie') is-invalid @enderror" value="{{ old('imie') }}" required>
                                             @error('imie') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
                                         </div>
                                         <div class="col-md-4">
                                             <label class="small text-muted mb-1">Nazwisko</label>
-                                            <input type="text" name="nazwisko" class="form-control bg-light border-0 @error('nazwisko') is-invalid @enderror" value="{{ old('nazwisko') }}" required>
+                                            <input type="text" name="nazwisko" maxlength="26" class="form-control bg-light border-0 @error('nazwisko') is-invalid @enderror" value="{{ old('nazwisko') }}" required>
                                             @error('nazwisko') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
                                         </div>
-                                        <div class="col-md-4">
-                                            <label class="small text-muted mb-1">Telefon</label>
-                                            <div class="input-group">
-                                                <select name="kierunkowy" class="form-select bg-light border-0 flex-grow-0 w-auto" style="max-width: 95px;">
-                                                    @php $kier = old('kierunkowy', '+48'); @endphp
-                                                    @foreach(['+48' => 'PL', '+49' => 'DE', '+44' => 'UK', '+1' => 'US', '+380' => 'UA', '+420' => 'CZ', '+421' => 'SK', '+33' => 'FR', '+39' => 'IT', '+34' => 'ES'] as $pref => $kraj)
-                                                        <option value="{{ $pref }}" {{ $kier == $pref ? 'selected' : '' }}>{{ $pref }} {{ $kraj }}</option>
-                                                    @endforeach
-                                                </select>
-                                                <input type="text" name="telefon" class="form-control bg-light border-0 @error('telefon') is-invalid @enderror" placeholder="9 cyfr" value="{{ old('telefon') }}" required>
-                                            </div>
+                                        <div class="col-md-2">
+                                            <label class="small text-muted mb-1">Numer kierunkowy</label>
+                                            <input type="text" name="kierunkowy" id="input-kierunkowy" maxlength="4" class="form-control bg-light border-0 @error('kierunkowy') is-invalid @enderror" placeholder="+48" value="{{ old('kierunkowy', '+48') }}">
+                                            @error('kierunkowy') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="small text-muted mb-1">Numer telefonu</label>
+                                            <input type="text" name="telefon" class="form-control bg-light border-0 @error('telefon') is-invalid @enderror" placeholder="600100200" value="{{ old('telefon') }}" required>
                                             @error('telefon') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
                                         </div>
                                     </div>
@@ -111,7 +108,7 @@
                                         </div>
                                         <div class="col-md-4">
                                             <label class="small text-muted mb-1">Nr seryjny</label>
-                                            <input type="text" name="numer_seryjny" class="form-control bg-light border-0 @error('numer_seryjny') is-invalid @enderror" placeholder="SN..." value="{{ old('numer_seryjny') }}" required>
+                                            <input type="text" name="numer_seryjny" maxlength="26" class="form-control bg-light border-0 @error('numer_seryjny') is-invalid @enderror" placeholder="SN..." value="{{ old('numer_seryjny') }}" required>
                                             @error('numer_seryjny') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
                                         </div>
                                         <div class="col-md-6 mt-3">
@@ -327,6 +324,44 @@
                                 </form>
                             </div>
                         </div>
+
+                        <div class="col-12 mb-4">
+                            <div class="card p-4 shadow-sm bg-white">
+                                <h5 class="fw-bold">Edytuj lub usuń pozycje cennika</h5>
+                                <p class="text-muted small mb-3">Wybierz typ i model, aby zarządzać cenami oraz usuwać pozycje.</p>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-4">
+                                        <select id="edit-katalog-typ" class="form-select form-select-sm bg-light border-0">
+                                            <option value="">Wybierz typ...</option>
+                                            @foreach($typy as $typ)
+                                                <option value="{{ $typ }}">{{ $typ }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <select id="edit-katalog-model" class="form-select form-select-sm bg-light border-0" disabled>
+                                            <option value="">Najpierw wybierz typ...</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive" style="max-height: 320px;">
+                                    <table class="table table-sm table-hover align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Nazwa</th>
+                                                <th style="width: 320px;">Cena / typ</th>
+                                                <th style="width: 90px;" class="text-end">Usuń</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="lista-pozycji-cennika">
+                                            <tr><td colspan="3" class="text-center text-muted small py-3">Wybierz model, aby wyświetlić pozycje cennika.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -341,7 +376,7 @@
                             <!-- KARTA STATUSU -->
                             <div class="card p-4 shadow-sm bg-white mb-4 border-start border-4 border-info">
                                 <h5 class="fw-bold mb-2">Sprawdź status naprawy</h5>
-                                <p class="text-muted small mb-3">Wpisz numer zlecenia oraz telefon kontaktowy przypisany do naprawy.</p>
+                                <p class="text-muted small mb-3">Wpisz numer zlecenia oraz numer seryjny urządzenia.</p>
 
                                 <div class="row g-2 mb-3">
                                     <div class="col-md-4">
@@ -351,7 +386,7 @@
                                         </div>
                                     </div>
                                     <div class="col-md-5">
-                                        <input type="text" id="status-telefon" class="form-control bg-light border-0" placeholder="Nr telefonu">
+                                        <input type="text" id="status-numer-seryjny" class="form-control bg-light border-0" placeholder="Numer seryjny">
                                     </div>
                                     <div class="col-md-3">
                                         <button class="btn btn-info text-white fw-bold w-100" type="button" id="btn-check-status">Szukaj</button>
@@ -367,6 +402,36 @@
         </div>
     </div>
 </div>
+
+@if(session('nowe_zlecenie'))
+    @php $noweZlecenie = session('nowe_zlecenie'); @endphp
+    <div class="modal fade" id="zlecenieModal" tabindex="-1" aria-hidden="true"
+         data-zlecenie-id="{{ $noweZlecenie['id'] }}">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-header bg-success text-white border-0">
+            <h5 class="modal-title fw-bold">Zlecenie przyjęte</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted mb-3">Zlecenie zostało zapisane w systemie. Poniżej dane potwierdzające.</p>
+            <div class="bg-light rounded p-3 mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Numer zlecenia</span>
+                <span class="fw-bold fs-5">#{{ $noweZlecenie['id'] }}</span>
+            </div>
+            <div class="bg-light rounded p-3 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Numer seryjny</span>
+                <span class="fw-bold">{{ $noweZlecenie['numer_seryjny'] }}</span>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
+            <a href="{{ route('recepcja.wydruk', $noweZlecenie['id']) }}" class="btn text-white fw-bold" style="background-color:#8b5cf6;">Wydrukuj</a>
+          </div>
+        </div>
+      </div>
+    </div>
+@endif
 @endsection
 
 @section('scripts')
