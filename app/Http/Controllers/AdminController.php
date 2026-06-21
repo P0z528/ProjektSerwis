@@ -141,30 +141,39 @@ class AdminController
             'imie' => 'required|string|max:255',
             'nazwisko' => 'required|string|max:255',
             'telefon' => 'nullable|string|max:30',
+            'id_zlecenia' => 'nullable|integer|exists:Zlecenia,id',
+            'status' => ['nullable', Rule::in(self::STATUSY_ZLECEN)],
         ]);
 
-        DB::table('Klienci')->where('id', $id)->update([
-            'imie' => $request->imie,
-            'nazwisko' => $request->nazwisko,
-            'telefon' => $request->telefon,
-        ]);
-
-        return back()->with('success', 'Dane klienta zostały zaktualizowane.');
-    }
-
-    public function updateOrderStatus(Request $request, $id) {
-        $request->validate([
-            'status' => ['required', Rule::in(self::STATUSY_ZLECEN)],
-        ]);
-
-        $zlecenie = DB::table('Zlecenia')->where('id', $id)->first();
-        if (!$zlecenie) {
-            return back()->with('error', 'Nie znaleziono zlecenia.');
+        $klient = DB::table('Klienci')->where('id', $id)->first();
+        if (!$klient) {
+            return back()->with('error', 'Nie znaleziono klienta.');
         }
 
-        DB::table('Zlecenia')->where('id', $id)->update(['status' => $request->status]);
+        DB::transaction(function () use ($request, $id) {
+            DB::table('Klienci')->where('id', $id)->update([
+                'imie' => $request->imie,
+                'nazwisko' => $request->nazwisko,
+                'telefon' => $request->telefon,
+            ]);
 
-        return back()->with('success', 'Zaktualizowano status zlecenia #' . $id . '.');
+            if ($request->filled('id_zlecenia') && $request->filled('status')) {
+                $zlecenie = DB::table('Zlecenia as Z')
+                    ->join('Urzadzenia as U', 'Z.id_urzadzenia', '=', 'U.id')
+                    ->where('Z.id', $request->id_zlecenia)
+                    ->where('U.id_klienta', $id)
+                    ->select('Z.id')
+                    ->first();
+
+                if ($zlecenie) {
+                    DB::table('Zlecenia')->where('id', $request->id_zlecenia)->update([
+                        'status' => $request->status,
+                    ]);
+                }
+            }
+        });
+
+        return back()->with('success', 'Zaktualizowano dane klienta i zlecenia.');
     }
 
     public function deleteOrder($id) {
@@ -230,12 +239,23 @@ class AdminController
             'login' => $request->login,
             'rola' => $request->rola,
         ];
-        // Hasło zmieniamy tylko jeśli zostało podane
         if ($request->filled('haslo')) {
             $dane['haslo'] = Hash::make($request->haslo);
         }
 
-        DB::table('Uzytkownicy')->where('id', $id)->update($dane);
+        DB::transaction(function () use ($id, $pracownik, $dane, $request) {
+            // Zmiana roli z Technika na inną — odpinamy wszystkie jego zlecenia do puli.
+            if ($pracownik->rola === 'Technik' && $request->rola !== 'Technik') {
+                DB::table('Zlecenia')
+                    ->where('id_technika', $id)
+                    ->update([
+                        'id_technika' => null,
+                        'status' => 'W kolejce',
+                    ]);
+            }
+
+            DB::table('Uzytkownicy')->where('id', $id)->update($dane);
+        });
 
         return back()->with('success', 'Zaktualizowano dane pracownika.');
     }

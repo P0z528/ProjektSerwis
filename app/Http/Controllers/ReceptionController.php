@@ -145,8 +145,9 @@ class ReceptionController
                 'koszt' => $koszt,
                 'koszt_pierwotny' => $koszt,
                 'data_naprawy' => $validated['data_naprawy'],
-                // Zachowujemy pierwsze zdjęcie w starej kolumnie dla zgodności wstecznej
-                'zdjecie' => $sciezkiZdjec[0] ?? null
+                'zdjecie' => $sciezkiZdjec[0] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             // Zapis wszystkich zdjęć do dedykowanej tabeli

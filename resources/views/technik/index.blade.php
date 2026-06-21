@@ -33,6 +33,7 @@
 
             @if(session('success')) <div class="alert alert-success alert-dismissible"><button class="btn-close" data-bs-dismiss="alert"></button>{{ session('success') }}</div> @endif
             @if(session('warning')) <div class="alert alert-warning alert-dismissible"><button class="btn-close" data-bs-dismiss="alert"></button>{{ session('warning') }}</div> @endif
+            @if(session('error')) <div class="alert alert-danger alert-dismissible"><button class="btn-close" data-bs-dismiss="alert"></button>{{ session('error') }}</div> @endif
 
             <div class="mb-4">
                 <h2>Warsztat</h2>
@@ -44,7 +45,7 @@
                     <h6 class="text-muted">Do podjęcia</h6><h3 class="fw-bold">{{ $kpiDoPodjecia }}</h3>
                 </div></div></div>
                 <div class="col-md-4"><div class="card shadow-sm border-0 border-top border-primary border-3"><div class="card-body">
-                    <h6 class="text-muted">Moje aktywne</h6><h3 class="fw-bold">{{ $kpiAktywne }}</h3>
+                    <h6 class="text-muted">Moje aktywne</h6><h3 class="fw-bold">{{ $kpiAktywne }}<span class="fs-6 text-muted fw-normal"> / {{ $limitAktywnych }}</span></h3>
                 </div></div></div>
                 <div class="col-md-4"><div class="card shadow-sm border-0 border-top border-warning border-3"><div class="card-body">
                     <h6 class="text-muted">Brak części</h6><h3 class="fw-bold">{{ $kpiBrakCzesci }}</h3>
@@ -55,21 +56,36 @@
                 <div class="col-md-6">
                     <div class="card shadow-sm border-0 h-100 p-3">
                         <h5 class="fw-bold">Wspólna pula zleceń</h5>
-                        <p class="text-muted small mb-4">Zlecenia oczekujące na podjęcie przez technika.</p>
+                        <p class="text-muted small mb-2">Zlecenia oczekujące na podjęcie — priorytetowe i najstarsze na górze listy.</p>
+                        @if($limitOsiagniety)
+                            <div class="alert alert-warning py-2 small mb-3" role="alert">
+                                Osiągnąłeś limit {{ $limitAktywnych }} aktywnych zleceń. Zakończ coś, aby wziąć kolejne.
+                            </div>
+                        @endif
 
                         <div class="d-flex flex-column gap-3">
                             @forelse($pula as $zl)
-                                <div class="card bg-white border shadow-sm">
+                                @php
+                                    $czyPriorytet = !empty($zl->powod_odrzucenia) || !empty($zl->klient_odrzucil_koszty);
+                                @endphp
+                                <div class="card bg-white border shadow-sm @if($czyPriorytet) border-danger border-2 @endif">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <div>
                                                 <span class="text-muted fw-bold me-2">#{{ $zl->id }}</span>
                                                 <span class="badge bg-indigo bg-opacity-10 text-indigo rounded-pill">{{ $zl->status }}</span>
+                                                @if($czyPriorytet)
+                                                    <span class="badge bg-danger rounded-pill ms-1">PRIORYTET</span>
+                                                @endif
                                             </div>
-                                            <form action="{{ route('technik.takeOrder', $zl->id) }}" method="POST" class="m-0">
-                                                @csrf
-                                                <button class="btn btn-sm text-white" style="background-color: #8b5cf6;">▶ Biorę</button>
-                                            </form>
+                                            @if($limitOsiagniety)
+                                                <button type="button" class="btn btn-sm btn-secondary" disabled title="Limit {{ $limitAktywnych }} aktywnych zleceń">▶ Biorę</button>
+                                            @else
+                                                <form action="{{ route('technik.takeOrder', $zl->id) }}" method="POST" class="m-0">
+                                                    @csrf
+                                                    <button class="btn btn-sm text-white" style="background-color: #8b5cf6;">▶ Biorę</button>
+                                                </form>
+                                            @endif
                                         </div>
                                         <h5 class="fw-bold m-0">{{ $zl->model ?? 'Nieznane urządzenie' }}</h5>
                                         <p class="text-muted small mt-1 mb-0">{{ Str::limit($zl->opis_usterki, 50) }}</p>
@@ -137,6 +153,11 @@
                                             </div>
                                         @endif
 
+                                        @php
+                                            $blokadaZakonczenia = str_contains($zl->status, 'Czeka na części')
+                                                || !empty($zl->ma_niezrealizowane_zap);
+                                        @endphp
+
                                         <div class="d-flex justify-content-between align-items-end">
                                             <div>
                                                 <h5 class="fw-bold m-0">{{ $zl->model ?? 'Nieznane urządzenie' }}</h5>
@@ -147,10 +168,14 @@
                                                 @if(!str_contains($zl->status, 'Czeka na części') && !str_contains($zl->status, 'Części dostępne'))
                                                     <button type="button" class="btn btn-sm btn-outline-secondary btn-parts" data-id="{{ $zl->id }}" data-model="{{ $zl->model }}">Brak części</button>
                                                 @endif
-                                                <form action="{{ route('technik.finishOrder', $zl->id) }}" method="POST" class="m-0">
-                                                    @csrf
-                                                    <button class="btn btn-sm btn-success">Gotowe</button>
-                                                </form>
+                                                @if($blokadaZakonczenia)
+                                                    <button type="button" class="btn btn-sm btn-success" disabled title="Oczekujesz na wydanie części z magazynu">Gotowe</button>
+                                                @else
+                                                    <form action="{{ route('technik.finishOrder', $zl->id) }}" method="POST" class="m-0">
+                                                        @csrf
+                                                        <button class="btn btn-sm btn-success">Gotowe</button>
+                                                    </form>
+                                                @endif
                                             </div>
                                         </div>
                                         @php

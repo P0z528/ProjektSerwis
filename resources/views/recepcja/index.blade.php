@@ -425,8 +425,8 @@
             </div>
           </div>
           <div class="modal-footer border-0">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
-            <a href="{{ route('recepcja.wydruk', $noweZlecenie['id']) }}" class="btn text-white fw-bold" style="background-color:#8b5cf6;">Wydrukuj</a>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="btn-zamknij-zlecenie">Zamknij</button>
+            <a href="{{ route('recepcja.wydruk', $noweZlecenie['id']) }}" id="btn-wydruk-zlecenie" class="btn text-white fw-bold" style="background-color:#8b5cf6;">Wydrukuj</a>
           </div>
         </div>
       </div>

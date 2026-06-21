@@ -8,21 +8,62 @@ use Illuminate\Support\Facades\Auth;
 
 class TechnicianController
 {
+    private const AKTYWNE_STATUSY = [
+        'Poprawka (Priorytet)',
+        'W naprawie',
+        'Czeka na części',
+        'Części dostępne',
+    ];
+
+    private const LIMIT_AKTYWNYCH_ZLECEN = 4;
+
+    /**
+     * Czy zlecenie ma zapotrzebowania jeszcze niewydane z magazynu (Oczekuje, Do zamówienia itd.).
+     */
+    private function czyMaNiezrealizowaneZapotrzebowania(int $idZlecenia): bool
+    {
+        return DB::table('Zapotrzebowania')
+            ->where('id_zlecenia', $idZlecenia)
+            ->where('status', '!=', 'Wydano')
+            ->exists();
+    }
+
+    private function policzAktywneZlecenia(int $technikId): int
+    {
+        return DB::table('Zlecenia')
+            ->where('id_technika', $technikId)
+            ->whereIn('status', self::AKTYWNE_STATUSY)
+            ->count();
+    }
+
     public function index() {
         $userId = Auth::id();
 
-        // 1. Zlecenia w puli wspólnej
+        // 1. Zlecenia w puli wspólnej (bez technika, priorytet na górze, najstarsze pierwsze)
         $pula = DB::table('Zlecenia as Z')
             ->leftJoin('Urzadzenia as U', 'Z.id_urzadzenia', '=', 'U.id')
+            ->whereNull('Z.id_technika')
             ->whereIn('Z.status', ['W kolejce', 'Przyjęte'])
-            ->select('Z.id', 'U.model', 'Z.status', 'Z.opis_usterki', 'Z.zdjecie')
+            ->select(
+                'Z.id',
+                'U.model',
+                'Z.status',
+                'Z.opis_usterki',
+                'Z.zdjecie',
+                'Z.powod_odrzucenia',
+                'Z.klient_odrzucil_koszty',
+                'Z.created_at'
+            )
+            ->orderByRaw("CASE WHEN (Z.powod_odrzucenia IS NOT NULL AND Z.powod_odrzucenia != '') OR Z.klient_odrzucil_koszty = 1 THEN 0 ELSE 1 END")
+            ->orderBy('Z.created_at', 'asc')
+            ->orderBy('Z.id', 'asc')
             ->get();
 
         // 2. Zlecenia przypisane do technika
         $moje = DB::table('Zlecenia as Z')
             ->leftJoin('Urzadzenia as U', 'Z.id_urzadzenia', '=', 'U.id')
             ->where('Z.id_technika', $userId)
-            ->whereIn('Z.status', ['Poprawka (Priorytet)', 'W naprawie', 'Czeka na części', 'Części dostępne'])
+            ->whereIn('Z.status', self::AKTYWNE_STATUSY)
             ->select('Z.id', 'U.model', 'Z.status', 'Z.opis_usterki', 'Z.zdjecie', 'Z.powod_odrzucenia', 'Z.klient_odrzucil_koszty')
             ->get();
 
@@ -41,30 +82,53 @@ class TechnicianController
         $dolaczZdjecia($pula);
         $dolaczZdjecia($moje);
 
+        $niezrealizowaneZap = DB::table('Zapotrzebowania')
+            ->whereIn('id_zlecenia', $moje->pluck('id'))
+            ->where('status', '!=', 'Wydano')
+            ->pluck('id_zlecenia')
+            ->unique()
+            ->flip();
+
+        foreach ($moje as $zl) {
+            $zl->ma_niezrealizowane_zap = isset($niezrealizowaneZap[$zl->id]);
+        }
+
         // 3. KPI (Statystyki na górze)
         $kpiDoPodjecia = $pula->count();
         $kpiAktywne = $moje->count();
         $kpiBrakCzesci = DB::table('Zlecenia')->where('id_technika', $userId)->where('status', 'Czeka na części')->count();
 
-        return view('technik.index', compact('pula', 'moje', 'kpiDoPodjecia', 'kpiAktywne', 'kpiBrakCzesci'));
+        $limitAktywnych = self::LIMIT_AKTYWNYCH_ZLECEN;
+        $limitOsiagniety = $kpiAktywne >= $limitAktywnych;
+
+        return view('technik.index', compact(
+            'pula', 'moje', 'kpiDoPodjecia', 'kpiAktywne', 'kpiBrakCzesci',
+            'limitAktywnych', 'limitOsiagniety'
+        ));
     }
 
     public function takeOrder($id) {
-        $aktywneZlecenia = DB::table('Zlecenia')
-            ->where('id_technika', Auth::id())
-            ->whereNotIn('status', ['Do kontroli', 'Wydane', 'W kolejce'])
-            ->count();
-
-        if ($aktywneZlecenia > 0) {
-            return back()->with('error', 'Odrzucono: Masz już urządzenie na stole serwisowym! Zakończ bieżącą naprawę (lub zgłoś brak części), zanim weźmiesz kolejną.');
+        if ($this->policzAktywneZlecenia((int) Auth::id()) >= self::LIMIT_AKTYWNYCH_ZLECEN) {
+            return back()->with('error', 'Osiągnąłeś limit 4 aktywnych zleceń. Zakończ coś, aby wziąć kolejne.');
         }
+
+        $zlecenie = DB::table('Zlecenia')->where('id', $id)->first();
+        if (!$zlecenie || !in_array($zlecenie->status, ['W kolejce', 'Przyjęte'], true) || $zlecenie->id_technika !== null) {
+            return back()->with('error', 'To zlecenie nie jest już dostępne w puli.');
+        }
+
+        $oczekujeNaCzesci = $this->czyMaNiezrealizowaneZapotrzebowania((int) $id);
 
         DB::table('Zlecenia')->where('id', $id)->update([
             'id_technika' => Auth::id(),
-            'status' => 'W naprawie'
+            'status' => $oczekujeNaCzesci ? 'Czeka na części' : 'W naprawie',
         ]);
 
-        return back()->with('success', 'Urządzenie trafiło na Twój stół serwisowy. Powodzenia!');
+        if ($oczekujeNaCzesci) {
+            return back()->with('warning', 'Zlecenie przypisane. Oczekujesz na wydanie części z magazynu');
+        }
+
+        return back()->with('success', 'Urządzenie trafiło na Twój stół serwisowy.');
     }
 
     public function finishOrder($id) {
@@ -72,9 +136,8 @@ class TechnicianController
 
         if ($zlecenie && $zlecenie->id_technika == Auth::id()) {
 
-            // --- BLOKADA 1: Nie można zakończyć zlecenia bez części ---
-            if ($zlecenie->status === 'Czeka na części') {
-                return back()->with('warning', 'Odrzucono: Nie możesz zakończyć naprawy, ponieważ sprzęt oczekuje na dostawę części z magazynu!');
+            if ($zlecenie->status === 'Czeka na części' || $this->czyMaNiezrealizowaneZapotrzebowania((int) $id)) {
+                return back()->with('error', 'Nie można zakończyć naprawy. Magazyn nie wydał jeszcze wszystkich zamówionych części.');
             }
 
             // Wysyłka do QA - czyścimy poprzednie odrzucenie i flagę rollback klienta
@@ -155,29 +218,40 @@ class TechnicianController
             ->get()
             ->keyBy('id');
 
-        DB::transaction(function() use ($id, $czesci_id, $czesciDane, $pierwotne, $zlecenie) {
-            DB::table('Zlecenia')->where('id', $id)->update(['status' => 'Czeka na części']);
+        $noweZapotrzebowania = [];
+        $kosztDodatkowy = 0;
 
-            $kosztDodatkowy = 0;
-            $zapotrzebowania = [];
-            foreach ($czesci_id as $czesc_id) {
-                $dane = $czesciDane->get($czesc_id);
-                $czyDodatkowa = $dane ? !in_array($dane->nazwa_czesci, $pierwotne) : false;
-
-                if ($czyDodatkowa && $dane) {
-                    $kosztDodatkowy += (float) $dane->cena;
-                }
-
-                $zapotrzebowania[] = [
-                    'id_zlecenia' => $id,
-                    'id_czesci_katalog' => $czesc_id,
-                    'status' => 'Oczekuje',
-                    'dodatkowa' => $czyDodatkowa,
-                ];
+        foreach ($czesci_id as $czesc_id) {
+            if (DB::table('Zapotrzebowania')
+                ->where('id_zlecenia', $id)
+                ->where('id_czesci_katalog', $czesc_id)
+                ->exists()) {
+                continue;
             }
-            DB::table('Zapotrzebowania')->insert($zapotrzebowania);
 
-            // Doliczamy koszt dodatkowych części do łącznego kosztu zlecenia
+            $dane = $czesciDane->get($czesc_id);
+            $czyDodatkowa = $dane ? !in_array($dane->nazwa_czesci, $pierwotne) : false;
+
+            if ($czyDodatkowa && $dane) {
+                $kosztDodatkowy += (float) $dane->cena;
+            }
+
+            $noweZapotrzebowania[] = [
+                'id_zlecenia' => $id,
+                'id_czesci_katalog' => $czesc_id,
+                'status' => 'Oczekuje',
+                'dodatkowa' => $czyDodatkowa,
+            ];
+        }
+
+        if (empty($noweZapotrzebowania)) {
+            return back()->with('warning', 'Wybrane części zostały już zgłoszone do magazynu dla tego zlecenia.');
+        }
+
+        DB::transaction(function () use ($id, $noweZapotrzebowania, $kosztDodatkowy, $zlecenie) {
+            DB::table('Zlecenia')->where('id', $id)->update(['status' => 'Czeka na części']);
+            DB::table('Zapotrzebowania')->insert($noweZapotrzebowania);
+
             if ($kosztDodatkowy > 0) {
                 DB::table('Zlecenia')->where('id', $id)->update([
                     'koszt' => (float) $zlecenie->koszt + $kosztDodatkowy,

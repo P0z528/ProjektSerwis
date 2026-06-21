@@ -45,7 +45,6 @@ Route::middleware(['auth'])->group(function () {
 
     // Zarządzanie klientami i zleceniami
     Route::post('/admin/klient/{id}', [AdminController::class, 'updateClient'])->name('admin.updateClient');
-    Route::post('/admin/zlecenie/{id}/status', [AdminController::class, 'updateOrderStatus'])->name('admin.updateOrderStatus');
     Route::post('/admin/zlecenie/{id}/usun', [AdminController::class, 'deleteOrder'])->name('admin.deleteOrder');
 
     // Zarządzanie pracownikami

@@ -193,13 +193,12 @@
                                         <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
                                             <button type="button" class="btn btn-sm btn-outline-primary btn-edit-client"
                                                     data-id="{{ $zl->id_klienta }}"
+                                                    data-zlecenie-id="{{ $zl->id_zlecenia }}"
+                                                    data-status="{{ $zl->status }}"
+                                                    data-model="{{ $zl->model }}"
                                                     data-imie="{{ $zl->imie }}"
                                                     data-nazwisko="{{ $zl->nazwisko }}"
                                                     data-telefon="{{ $zl->telefon }}">Edytuj klienta</button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-edit-status"
-                                                    data-id="{{ $zl->id_zlecenia }}"
-                                                    data-status="{{ $zl->status }}"
-                                                    data-model="{{ $zl->model }}">Edytuj status</button>
                                             <form action="{{ route('admin.deleteOrder', $zl->id_zlecenia) }}" method="POST" class="m-0"
                                                   onsubmit="return confirm('Na pewno usunąć to zlecenie i powiązane urządzenie? Tej operacji nie można cofnąć.');">
                                                 @csrf
@@ -335,45 +334,19 @@
   </div>
 </div>
 
-{{-- MODAL: Edycja statusu zlecenia --}}
-<div class="modal fade" id="orderStatusModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form id="orderStatusForm" method="POST" action="">
-        @csrf
-        <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold">Edycja statusu zlecenia</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted mb-3" id="orderStatusModelText">Zlecenie</p>
-          <label class="small text-muted mb-1">Nowy status</label>
-          <select name="status" id="orderStatusSelect" class="form-select bg-light border-0" required>
-            @foreach($statusyZlecen as $status)
-              <option value="{{ $status }}">{{ $status }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="modal-footer border-0">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
-          <button type="submit" class="btn btn-success">Zapisz status</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-{{-- MODAL: Edycja klienta --}}
+{{-- MODAL: Edycja klienta i statusu zlecenia --}}
 <div class="modal fade" id="clientModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form id="clientForm" method="POST" action="">
         @csrf
+        <input type="hidden" name="id_zlecenia" id="clientZlecenieId">
         <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold">Edycja danych klienta</h5>
+          <h5 class="modal-title fw-bold">Edycja klienta i zlecenia</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <p class="text-muted mb-3" id="clientZlecenieText">Zlecenie</p>
           <div class="mb-3">
             <label class="small text-muted mb-1">Imię</label>
             <input type="text" name="imie" id="clientImie" class="form-control bg-light border-0" required>
@@ -385,6 +358,14 @@
           <div class="mb-3">
             <label class="small text-muted mb-1">Telefon</label>
             <input type="text" name="telefon" id="clientTelefon" class="form-control bg-light border-0">
+          </div>
+          <div class="mb-3">
+            <label class="small text-muted mb-1">Status zlecenia</label>
+            <select name="status" id="clientStatus" class="form-select bg-light border-0" required>
+              @foreach($statusyZlecen as $status)
+                <option value="{{ $status }}">{{ $status }}</option>
+              @endforeach
+            </select>
           </div>
         </div>
         <div class="modal-footer border-0">
@@ -486,26 +467,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- MODAL: Edycja statusu zlecenia ---
-    const orderStatusModalEl = document.getElementById('orderStatusModal');
-    if (orderStatusModalEl) {
-        const orderStatusModal = new bootstrap.Modal(orderStatusModalEl);
-        const orderStatusForm = document.getElementById('orderStatusForm');
-        const orderStatusSelect = document.getElementById('orderStatusSelect');
-
-        document.querySelectorAll('.btn-edit-status').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const id = this.dataset.id;
-                const status = this.dataset.status || 'W kolejce';
-                orderStatusForm.action = `/admin/zlecenie/${id}/status`;
-                document.getElementById('orderStatusModelText').innerText = `Zlecenie #${id} — ${this.dataset.model || ''}`;
-                orderStatusSelect.value = status;
-                orderStatusModal.show();
-            });
-        });
-    }
-
-    // --- MODAL: Edycja klienta ---
+    // --- MODAL: Edycja klienta i statusu zlecenia ---
     const clientModalEl = document.getElementById('clientModal');
     if (clientModalEl) {
         const clientModal = new bootstrap.Modal(clientModalEl);
@@ -513,9 +475,12 @@ document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll('.btn-edit-client').forEach(btn => {
             btn.addEventListener('click', function() {
                 clientForm.action = `/admin/klient/${this.dataset.id}`;
+                document.getElementById('clientZlecenieId').value = this.dataset.zlecenieId || '';
+                document.getElementById('clientZlecenieText').innerText = `Zlecenie #${this.dataset.zlecenieId || ''} — ${this.dataset.model || ''}`;
                 document.getElementById('clientImie').value = this.dataset.imie || '';
                 document.getElementById('clientNazwisko').value = this.dataset.nazwisko || '';
                 document.getElementById('clientTelefon').value = this.dataset.telefon || '';
+                document.getElementById('clientStatus').value = this.dataset.status || 'W kolejce';
                 clientModal.show();
             });
         });

@@ -298,7 +298,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         `;
                         statusResult.innerHTML = html;
                     } else {
-                        statusResult.innerHTML = `<div class="text-danger small fw-bold">✕ ${data.message}</div>`;
+                        statusResult.innerHTML = `<div class="text-danger small fw-bold"> ${data.message}</div>`;
                     }
                 })
                 .catch(err => {
@@ -372,7 +372,29 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- MODAL POTWIERDZENIA ZLECENIA (po dodaniu nowego zlecenia) ---
     const zlecenieModalEl = document.getElementById('zlecenieModal');
     if (zlecenieModalEl) {
-        new bootstrap.Modal(zlecenieModalEl).show();
+        let wydrukKlikniety = false;
+        let zezwolNaZamkniecie = false;
+
+        const zlecenieModal = new bootstrap.Modal(zlecenieModalEl);
+        zlecenieModal.show();
+
+        const btnWydruk = document.getElementById('btn-wydruk-zlecenie');
+        if (btnWydruk) {
+            btnWydruk.addEventListener('click', function () {
+                wydrukKlikniety = true;
+            });
+        }
+
+        zlecenieModalEl.addEventListener('hide.bs.modal', function (event) {
+            if (wydrukKlikniety || zezwolNaZamkniecie) {
+                return;
+            }
+            event.preventDefault();
+            if (confirm('Czy na pewno chcesz zamknąć bez drukowania potwierdzenia?')) {
+                zezwolNaZamkniecie = true;
+                zlecenieModal.hide();
+            }
+        });
     }
 
     // --- EDYCJA / USUWANIE POZYCJI CENNIKA ---
