@@ -126,12 +126,12 @@ Magazynier widzi listę zapotrzebowań zgłoszonych przez techników.
 - **Statusy części:** `Oczekuje` (jest na stanie), `Do zamówienia` (brak na stanie), `Wydano`.
 - **Księgowanie dostaw:** Jedno kliknięcie przenosi wszystkie pozycje z "Listy zakupów" na stan magazynowy, odblokowując możliwość wydania ich technikom.
 
-### 4. Panel Administratora — Zarządzanie i QA
+### 4. Panel Administratora — Zarządzanie i Kontrola jakości
 Administrator posiada najwyższe uprawnienia w systemie, czuwając nad poprawnością obiegu dokumentów.
 
 - **Zarządzanie pracownikami:** Możliwość dodawania nowych kont, edycji danych istniejących pracowników oraz ich bezpiecznego usuwania (z zachowaniem ciągłości zleceń).
 - **Zarządzanie klientami:** Pełny wgląd w listę klientów i przypisanych do nich urządzeń. Admin może ręcznie korygować dane kontaktowe oraz wymuszać zmiany statusów zleceń w sytuacjach wyjątkowych.
-- **Kontrola Jakości (QA):** Zatwierdzanie napraw ukończonych przez techników lub odsyłanie ich do poprawki z komentarzem.
+- **Kontrola jakości:** Zatwierdzanie napraw ukończonych przez techników lub odsyłanie ich do poprawki z komentarzem.
 
 ---
 
@@ -142,7 +142,7 @@ Pełny obieg urządzenia w systemie ElectroService:
 2. **Diagnostyka i Naprawa (Technik):** Pobranie zlecenia z puli, analiza usterki. Jeśli potrzebne są dodatkowe elementy – zgłoszenie zapotrzebowania do magazynu.
 3. **Obsługa części (Magazyn):** Weryfikacja stanu magazynowego. Jeśli części brak – dodanie do listy zakupów. Po dostawie – wydanie części technikowi.
 4. **Zakończenie prac (Technik):** Po zamontowaniu części technik oznacza zlecenie jako ukończone.
-5. **Kontrola (Administrator):** Weryfikacja poprawności naprawy. Zatwierdzenie (status "Gotowe") lub odrzucenie (status "Poprawka").
+5. **Kontrola jakości (Administrator):** Weryfikacja poprawności naprawy. Zatwierdzenie (status "Gotowe") lub odrzucenie (status "Poprawka").
 6. **Wydanie (Recepcja):** Rozliczenie końcowe z klientem (akceptacja ewentualnych zmian kosztów) i zmiana statusu na "Wydane".
 
 ---
