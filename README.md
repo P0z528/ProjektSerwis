@@ -56,13 +56,27 @@ php artisan key:generate
 ```
 
 **2. Baza danych**
-Utwórz plik bazy danych (jeśli używasz SQLite) i wykonaj migracje wraz z danymi początkowymi:
-```bash
+Utwórz pusty plik bazy danych (jeśli używasz SQLite) i wykonaj migracje wraz z danymi początkowymi.
+
+Windows (PowerShell):
+```powershell
 New-Item database/database.sqlite -ItemType File
 php artisan migrate --seed
 ```
 
-**3. Uruchomienie serwera**
+macOS / Linux:
+```bash
+touch database/database.sqlite
+php artisan migrate --seed
+```
+
+**3. Dowiązanie magazynu plików (zdjęcia)**
+Utwórz symboliczne dowiązanie katalogu `storage`, aby zdjęcia sprzętu wgrywane przez recepcję były widoczne w aplikacji:
+```bash
+php artisan storage:link
+```
+
+**4. Uruchomienie serwera**
 ```bash
 php artisan serve
 ```
@@ -70,7 +84,7 @@ Aplikacja będzie dostępna pod adresem: **http://localhost:8000**
 
 ---
 
-**4. Dane logowania (Seed)**
+**5. Dane logowania (Seed)**
 System generuje domyślne konta dla każdej roli:
 | Rola | Login | Hasło |
 | :--- | :--- | :--- |
