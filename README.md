@@ -71,7 +71,7 @@ php artisan migrate --seed
 ```
 
 **3. Dowiązanie magazynu plików (zdjęcia)**
-Utwórz symboliczne dowiązanie katalogu `storage`, aby zdjęcia sprzętu wgrywane przez recepcję były widoczne w aplikacji:
+Utwórz dowiązanie katalogu `storage`, aby wgrywane zdjecia były widoczne w aplikacji:
 ```bash
 php artisan storage:link
 ```
@@ -223,4 +223,4 @@ Interfejs został zbudowany w oparciu o framework **Bootstrap 5**, co zapewnia p
 ---
 *Projekt: System Zarządzania Serwisem Elektroniki*
 *Autor: Mateusz Pociecha*
-*Status: Academic Project / Senior Laravel Developer Approach*
+
