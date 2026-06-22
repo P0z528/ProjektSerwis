@@ -74,6 +74,22 @@ class AdminController
             ->where('Z.status', 'Do kontroli')
             ->get();
 
+        // Eager loading: wszystkie części/usługi przypisane do zleceń w kontroli jakości,
+        // łącznie z pozycjami dodanymi wtórnie przez technika (dodatkowa = true).
+        $czesciKontroli = DB::table('Zapotrzebowania as z')
+            ->join('CzesciKatalog as ck', 'z.id_czesci_katalog', '=', 'ck.id')
+            ->whereIn('z.id_zlecenia', $doKontroli->pluck('id'))
+            ->select('z.id_zlecenia', 'z.status as zap_status', 'z.dodatkowa', 'ck.nazwa_czesci', 'ck.typ', 'ck.cena')
+            ->orderByDesc('z.dodatkowa')
+            ->orderBy('ck.typ')
+            ->orderBy('ck.nazwa_czesci')
+            ->get()
+            ->groupBy('id_zlecenia');
+
+        foreach ($doKontroli as $zl) {
+            $zl->czesci = $czesciKontroli->get($zl->id, collect());
+        }
+
         // 5. Aktywne zlecenia klientów (widok Klienci — z urządzeniami i akcjami)
         $zleceniaKlientow = DB::table('Zlecenia as Z')
             ->join('Urzadzenia as U', 'Z.id_urzadzenia', '=', 'U.id')

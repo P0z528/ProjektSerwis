@@ -41,13 +41,13 @@
             </div>
 
             <div class="row mb-4">
-                <div class="col-md-4"><div class="card shadow-sm border-0 border-top border-purple border-3"><div class="card-body">
+                <div class="col-md-4"><div class="card shadow-sm border-0"><div class="card-body">
                     <h6 class="text-muted">Do podjęcia</h6><h3 class="fw-bold">{{ $kpiDoPodjecia }}</h3>
                 </div></div></div>
-                <div class="col-md-4"><div class="card shadow-sm border-0 border-top border-primary border-3"><div class="card-body">
+                <div class="col-md-4"><div class="card shadow-sm border-0"><div class="card-body">
                     <h6 class="text-muted">Moje aktywne</h6><h3 class="fw-bold">{{ $kpiAktywne }}<span class="fs-6 text-muted fw-normal"> / {{ $limitAktywnych }}</span></h3>
                 </div></div></div>
-                <div class="col-md-4"><div class="card shadow-sm border-0 border-top border-warning border-3"><div class="card-body">
+                <div class="col-md-4"><div class="card shadow-sm border-0"><div class="card-body">
                     <h6 class="text-muted">Brak części</h6><h3 class="fw-bold">{{ $kpiBrakCzesci }}</h3>
                 </div></div></div>
             </div>
@@ -79,11 +79,11 @@
                                                 @endif
                                             </div>
                                             @if($limitOsiagniety)
-                                                <button type="button" class="btn btn-sm btn-secondary" disabled title="Limit {{ $limitAktywnych }} aktywnych zleceń">▶ Biorę</button>
+                                                <button type="button" class="btn btn-sm btn-secondary" disabled title="Limit {{ $limitAktywnych }} aktywnych zleceń">Biorę</button>
                                             @else
                                                 <form action="{{ route('technik.takeOrder', $zl->id) }}" method="POST" class="m-0">
                                                     @csrf
-                                                    <button class="btn btn-sm text-white" style="background-color: #8b5cf6;">▶ Biorę</button>
+                                                    <button class="btn btn-sm text-white" style="background-color: #8b5cf6;">Biorę</button>
                                                 </form>
                                             @endif
                                         </div>
@@ -178,6 +178,34 @@
                                                 @endif
                                             </div>
                                         </div>
+
+                                        @if(isset($zl->czesci) && count($zl->czesci) > 0)
+                                            <div class="mt-3 border-top pt-2">
+                                                <span class="d-block small fw-bold text-muted mb-2">Wymiana / Usługa</span>
+                                                <div class="d-flex flex-column gap-1">
+                                                    @foreach($zl->czesci as $poz)
+                                                        <div class="d-flex justify-content-between align-items-center small">
+                                                            <span>
+                                                                {{ $poz->nazwa_czesci }}
+                                                                <span class="text-muted">({{ $poz->typ }})</span>
+                                                                @if($poz->dodatkowa)
+                                                                    <span class="badge bg-warning bg-opacity-25 text-warning ms-1">Dodatkowa</span>
+                                                                @endif
+                                                            </span>
+                                                            @php
+                                                                $zapBadge = match($poz->zap_status) {
+                                                                    'Wydano' => 'bg-success bg-opacity-10 text-success',
+                                                                    'Do zamówienia' => 'bg-danger bg-opacity-10 text-danger',
+                                                                    default => 'bg-secondary bg-opacity-10 text-secondary',
+                                                                };
+                                                            @endphp
+                                                            <span class="badge {{ $zapBadge }} rounded-pill">{{ $poz->zap_status }}</span>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+
                                         @php
                                             $galeria = (!empty($zl->zdjecia)) ? $zl->zdjecia : (($zl->zdjecie ?? null) ? [$zl->zdjecie] : []);
                                         @endphp
@@ -239,7 +267,6 @@
 @section('scripts')
 <style>
     /* Dodatkowe drobne kolory dla estetyki */
-    .border-purple { border-color: #8b5cf6 !important; }
     .text-indigo { color: #4338ca !important; }
     .bg-indigo { background-color: #e0e7ff !important; }
     .text-pink { color: #be185d !important; }
@@ -276,24 +303,24 @@ document.addEventListener("DOMContentLoaded", function() {
                         return;
                     }
 
-                    const sąWymagane = data.some(c => c.wymagana);
-                    if (sąWymagane) {
-                        partsContainer.innerHTML += '<p class="small text-danger fw-bold mb-2">Części wymagane w tym zleceniu są podświetlone. Pozostałe pozycje będą doliczone jako dodatkowe.</p>';
+                    const sąSugerowane = data.some(c => c.sugerowana);
+                    if (sąSugerowane) {
+                        partsContainer.innerHTML += '<p class="small text-muted mb-2">Pozycje wynikające z pierwotnej diagnozy są <span class="fw-bold text-warning">podświetlone i sugerowane</span>. Możesz je odznaczyć lub dobrać inne — wybór należy do Ciebie.</p>';
                     }
 
-                    // Wygeneruj Checkboxy (wymagane podświetlone i domyślnie zaznaczone)
+                    // Wygeneruj Checkboxy (sugerowane podświetlone i wstępnie zaznaczone, ale w pełni opcjonalne)
                     data.forEach(czesc => {
-                        const wymagana = czesc.wymagana;
-                        const wrapClass = wymagana
-                            ? 'form-check mb-2 p-2 rounded border border-danger bg-danger bg-opacity-10'
+                        const sugerowana = czesc.sugerowana;
+                        const wrapClass = sugerowana
+                            ? 'form-check mb-2 p-2 rounded border border-warning bg-warning bg-opacity-10'
                             : 'form-check mb-2 p-2';
                         const cena = parseFloat(czesc.cena).toFixed(2);
-                        const tag = wymagana
-                            ? '<span class="badge bg-danger ms-2">Wymagana</span>'
+                        const tag = sugerowana
+                            ? '<span class="badge bg-warning text-dark ms-2">Sugerowane</span>'
                             : '<span class="badge bg-secondary ms-2">Dodatkowa (+' + cena + ' PLN)</span>';
                         partsContainer.innerHTML += `
                             <div class="${wrapClass}">
-                                <input class="form-check-input" type="checkbox" name="czesci[]" value="${czesc.id}" id="czesc_${czesc.id}" ${wymagana ? 'checked' : ''}>
+                                <input class="form-check-input" type="checkbox" name="czesci[]" value="${czesc.id}" id="czesc_${czesc.id}" ${sugerowana ? 'checked' : ''}>
                                 <label class="form-check-label" for="czesc_${czesc.id}">${czesc.nazwa_czesci} ${tag}</label>
                             </div>
                         `;

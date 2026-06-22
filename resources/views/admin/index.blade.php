@@ -137,15 +137,33 @@
                                     <td class="fw-bold">#{{ $zl->id }}</td>
                                     <td>{{ $zl->model }}</td>
                                     <td class="text-muted">{{ $zl->technik ?? 'Brak' }}</td>
-                                    <td>{{ Str::limit($zl->opis_usterki, 30) }}</td>
+                                    <td>
+                                        <div>{{ Str::limit($zl->opis_usterki, 40) }}</div>
+                                        @if(isset($zl->czesci) && count($zl->czesci) > 0)
+                                            <ul class="list-unstyled mb-0 mt-2 small">
+                                                @foreach($zl->czesci as $poz)
+                                                    <li class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                                        <span>
+                                                            {{ $poz->nazwa_czesci }}
+                                                            <span class="text-muted">({{ $poz->typ }})</span>
+                                                            @if($poz->dodatkowa)
+                                                                <span class="badge bg-warning bg-opacity-25 text-warning ms-1">Dodatkowa</span>
+                                                            @endif
+                                                        </span>
+                                                        <span class="text-muted">{{ number_format($poz->cena, 2) }} PLN</span>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        @endif
+                                    </td>
                                     <td class="fw-bold">{{ number_format($zl->koszt, 2) }} PLN</td>
                                     <td class="text-end">
                                         <div class="d-inline-flex gap-2">
                                             <button type="button" class="btn btn-sm btn-outline-danger btn-reject"
-                                                    data-id="{{ $zl->id }}" data-model="{{ $zl->model }}">✕ Poprawka</button>
+                                                    data-id="{{ $zl->id }}" data-model="{{ $zl->model }}">Poprawka</button>
                                             <form action="{{ route('admin.approve', $zl->id) }}" method="POST" class="m-0">
                                                 @csrf
-                                                <button type="submit" class="btn btn-sm btn-success">✓ Zatwierdź</button>
+                                                <button type="submit" class="btn btn-sm btn-success">Zatwierdź</button>
                                             </form>
                                         </div>
                                     </td>
@@ -327,7 +345,7 @@
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
-          <button type="submit" class="btn btn-danger">✕ Odeślij do poprawki</button>
+          <button type="submit" class="btn btn-danger">Odeślij do poprawki</button>
         </div>
       </form>
     </div>

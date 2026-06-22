@@ -89,8 +89,21 @@ class TechnicianController
             ->unique()
             ->flip();
 
+        // Eager loading: wszystkie części/usługi zgłoszone do zlecenia (również dodatkowe,
+        // dołożone przez technika poza pierwotną diagnozą) wraz z ich statusem wydania.
+        $czesciZlecen = DB::table('Zapotrzebowania as z')
+            ->join('CzesciKatalog as ck', 'z.id_czesci_katalog', '=', 'ck.id')
+            ->whereIn('z.id_zlecenia', $moje->pluck('id'))
+            ->select('z.id_zlecenia', 'z.status as zap_status', 'z.dodatkowa', 'ck.nazwa_czesci', 'ck.typ', 'ck.cena')
+            ->orderByDesc('z.dodatkowa')
+            ->orderBy('ck.typ')
+            ->orderBy('ck.nazwa_czesci')
+            ->get()
+            ->groupBy('id_zlecenia');
+
         foreach ($moje as $zl) {
             $zl->ma_niezrealizowane_zap = isset($niezrealizowaneZap[$zl->id]);
+            $zl->czesci = $czesciZlecen->get($zl->id, collect());
         }
 
         // 3. KPI (Statystyki na górze)
@@ -156,7 +169,8 @@ class TechnicianController
 
     /**
      * Zwraca fizyczne części dla modelu danego zlecenia i oznacza,
-     * które z nich były WYMAGANE w pierwotnym zleceniu (do podświetlenia).
+     * które z nich wynikają z pierwotnej diagnozy (SUGEROWANE — tylko do podświetlenia).
+     * Technik ma pełną swobodę wyboru: może je odznaczyć lub dobrać inne.
      */
     public function getPartsForOrder($id) {
         $zlecenie = DB::table('Zlecenia as Z')
@@ -183,7 +197,8 @@ class TechnicianController
             ->select('ck.id', 'ck.nazwa_czesci', 'ck.cena')
             ->get()
             ->map(function ($c) use ($pierwotne) {
-                $c->wymagana = in_array($c->nazwa_czesci, $pierwotne);
+                // Flaga wyłącznie podpowiedzi — NIE jest wymuszana przy zamawianiu.
+                $c->sugerowana = in_array($c->nazwa_czesci, $pierwotne);
                 return $c;
             });
 

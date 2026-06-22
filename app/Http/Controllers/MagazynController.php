@@ -52,28 +52,46 @@ class MagazynController
         $wybrane = $request->input('wybrane_zap');
         if (!$wybrane) return back()->with('warning', 'Zaznacz co najmniej jedno zapotrzebowanie do realizacji!');
 
-        DB::transaction(function () use ($wybrane) {
-            foreach ($wybrane as $zap_id) {
-                $zap = DB::table('Zapotrzebowania')->where('id', $zap_id)->first();
-                if (!$zap) continue;
+        // Pobieramy wybrane zapotrzebowania (pomijając ewentualne nieistniejące pozycje)
+        $zapotrzebowania = DB::table('Zapotrzebowania')->whereIn('id', $wybrane)->get();
+        if ($zapotrzebowania->isEmpty()) {
+            return back()->with('warning', 'Zaznaczone zapotrzebowania nie istnieją.');
+        }
 
+        // Ile sztuk danej części katalogowej chcemy łącznie wydać w tej operacji
+        $wymaganeIlosci = $zapotrzebowania->groupBy('id_czesci_katalog')->map->count();
+
+        // --- TWARDA WALIDACJA STANU MAGAZYNOWEGO (przed jakąkolwiek zmianą) ---
+        // Jeśli choć jednej części brakuje lub jest jej mniej niż żądana ilość, blokujemy całą operację.
+        foreach ($wymaganeIlosci as $idCzesciKatalog => $potrzeba) {
+            $stan = (int) (DB::table('Czesci')->where('id_czesci_katalog', $idCzesciKatalog)->value('ilosc') ?? 0);
+            if ($stan < $potrzeba) {
+                return back()->with('error', 'Błąd: Brak wystarczającej ilości części w magazynie, nie można wydać!');
+            }
+        }
+
+        // Stan wystarczający dla wszystkich pozycji — wykonujemy wydanie.
+        DB::transaction(function () use ($zapotrzebowania) {
+            foreach ($zapotrzebowania as $zap) {
                 $czesc = DB::table('Czesci')->where('id_czesci_katalog', $zap->id_czesci_katalog)->first();
 
-                if ($czesc && $czesc->ilosc > 0) {
-                    // Aktualizacja stanu i zapotrzebowania
-                    DB::table('Czesci')->where('id', $czesc->id)->decrement('ilosc', 1);
-                    DB::table('Zapotrzebowania')->where('id', $zap_id)->update(['status' => 'Wydano']);
+                // Druga linia obrony wewnątrz transakcji (gdyby stan zmienił się równolegle).
+                if (!$czesc || $czesc->ilosc <= 0) {
+                    throw new \RuntimeException('Stan magazynowy zmienił się w trakcie wydawania.');
+                }
 
-                    // Sprawdzenie czy całe zlecenie jest gotowe
-                    $pozostale = DB::table('Zapotrzebowania')->where('id_zlecenia', $zap->id_zlecenia)->where('status', '!=', 'Wydano')->count();
-                    if ($pozostale == 0) {
-                        DB::table('Zlecenia')->where('id', $zap->id_zlecenia)->update(['status' => 'Części dostępne']);
-                    }
+                DB::table('Czesci')->where('id', $czesc->id)->decrement('ilosc', 1);
+                DB::table('Zapotrzebowania')->where('id', $zap->id)->update(['status' => 'Wydano']);
+
+                // Sprawdzenie czy całe zlecenie jest gotowe
+                $pozostale = DB::table('Zapotrzebowania')->where('id_zlecenia', $zap->id_zlecenia)->where('status', '!=', 'Wydano')->count();
+                if ($pozostale == 0) {
+                    DB::table('Zlecenia')->where('id', $zap->id_zlecenia)->update(['status' => 'Części dostępne']);
                 }
             }
         });
 
-        return back()->with('success', 'Wydano zaznaczone i dostępne części z magazynu.');
+        return back()->with('success', 'Wydano zaznaczone części z magazynu.');
     }
 
     public function przeniesDoZamowienia(Request $request) {

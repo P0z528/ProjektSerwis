@@ -148,8 +148,8 @@
                                     <h2 class="m-0 fw-bold" id="suma-pln">0.00 PLN</h2>
                                 </div>
                                 <div class="d-flex gap-2">
-                                    <button type="submit" form="form-zlecenie" class="btn btn-success flex-grow-1">✓ Akceptuj</button>
-                                    <button type="button" id="btn-odrzuc" class="btn btn-outline-danger flex-grow-1">✕ Odrzuć</button>
+                                    <button type="submit" form="form-zlecenie" class="btn btn-success flex-grow-1">Akceptuj</button>
+                                    <button type="button" id="btn-odrzuc" class="btn btn-outline-danger flex-grow-1">Odrzuć</button>
                                 </div>
                             </div>
 
@@ -188,11 +188,11 @@
                                                             <div class="d-flex gap-1">
                                                                 <form action="{{ url('/recepcja/wydaj/'.$zl->id) }}" method="POST" class="m-0">
                                                                     @csrf
-                                                                    <button type="submit" class="btn btn-sm btn-success py-1 px-2">✓ Akceptuje</button>
+                                                                    <button type="submit" class="btn btn-sm btn-success py-1 px-2">Akceptuje</button>
                                                                 </form>
                                                                 <form action="{{ route('recepcja.rejectCost', $zl->id) }}" method="POST" class="m-0">
                                                                     @csrf
-                                                                    <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2">✕ Odrzuca</button>
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2">Odrzuca</button>
                                                                 </form>
                                                             </div>
                                                         </div>
