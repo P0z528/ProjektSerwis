@@ -87,7 +87,7 @@ ElectroService jest aplikacją webową typu SaaS. Użytkownik końcowy (pracowni
 **Wymagania sprzętowe:**
 - Dowolny komputer/tablet z dostępem do internetu.
 - Rekomendowana rozdzielczość ekranu: min. 1280x720 px (pełna responsywność).
-- Przeglądarka z obsługą JavaScript i HTML5 (do kompresji zdjęć w locie).
+- Przeglądarka z obsługą JavaScript i HTML5.
 
 ---
 
@@ -97,16 +97,16 @@ ElectroService jest aplikacją webową typu SaaS. Użytkownik końcowy (pracowni
 
 | Rola | Odpowiedzialność | Kluczowe funkcje |
 |---|---|---|
-| **Administrator** | Zarządzanie zasobami ludzkimi i procesem | Zarządzanie pracownikami, edycja danych klientów i statusów, kontrola jakości (QA), statystyki KPI. |
+| **Administrator** | Zarządzanie zasobami ludzkimi i procesem | Zarządzanie pracownikami, edycja danych klientów i statusów, kontrola jakości, statystyki. |
 | **Recepcja** | Kontakt z klientem i logistyka przyjęć | Dynamiczny kalendarz, tworzenie zleceń, wydruki potwierdzeń .txt, wydawanie sprzętu. |
-| **Technik** | Serwis fizyczny urządzeń | Pobieranie zleceń (max 4), zamawianie części, raportowanie napraw. |
+| **Technik** | Serwis fizyczny urządzeń | Pobieranie zleceń , raportowanie napraw. |
 | **Magazyn** | Gospodarka częściami | Obsługa zapotrzebowań, księgowanie dostaw, kontrola stanów magazynowych. |
 
 
 ### 1. Panel Administratora — Zarządzanie i Kontrola jakości
 Administrator posiada najwyższe uprawnienia w systemie, czuwając nad poprawnością obiegu dokumentów.
 
-- **Zarządzanie pracownikami:** Możliwość dodawania nowych kont, edycji danych istniejących pracowników oraz ich bezpiecznego usuwania (z zachowaniem ciągłości zleceń).
+- **Zarządzanie pracownikami:** Możliwość dodawania nowych kont, edycji danych istniejących pracowników oraz ich bezpiecznego usuwania.
 - **Zarządzanie klientami:** Pełny wgląd w listę klientów i przypisanych do nich urządzeń. Admin może ręcznie korygować dane kontaktowe oraz wymuszać zmiany statusów zleceń w sytuacjach wyjątkowych.
 - **Kontrola jakości:** Zatwierdzanie napraw ukończonych przez techników lub odsyłanie ich do poprawki z komentarzem.
 
@@ -116,16 +116,16 @@ Głównym zadaniem recepcji jest sprawne wprowadzenie klienta do systemu.
 - **Dynamiczny Kalendarz:** System automatycznie oblicza limity przyjęć:
   - Dni robocze: **13 urządzeń**.
   - Soboty: **10 urządzeń**.
-  - Niedziele: **Nieczynne** (blokada wyboru).
-- **Walidacja danych:** System normalizuje numery kierunkowe (domyślnie +48) i sprawdza poprawność numeru telefonu (9 cyfr dla PL).
-- **Katalog Apple:** Wybór modelu (np. iPhone 15 Pro) automatycznie filtruje dostępne części i usługi w cenniku.
+  - Niedziele: **Nieczynne**.
+- **Walidacja danych:** System normalizuje numery kierunkowe (domyślnie +48) i sprawdza poprawność numeru telefonu.
+- **Katalog:** Wybór modelu automatycznie filtruje dostępne części i usługi w cenniku.
 - **Potwierdzenie .txt:** Po zapisaniu zlecenia generowany jest dokument `Zlecenie_{ID}.txt` gotowy do wydruku dla klienta.
 
 ### 3. Panel Technika — Warsztat
 Technik operuje na "puli wspólnej" zleceń o statusie "W kolejce".
 
 - **Limit obciążenia:** Jeden technik może mieć przypisane maksymalnie **4 aktywne zlecenia**. Próba wzięcia kolejnego skutkuje blokadą.
-- **Sortowanie Priorytetowe:** Na górze listy zawsze pojawiają się zlecenia odrzucone przez QA (Poprawka) oraz te z "Rollbackiem" od klienta.
+- **Sortowanie Priorytetowe:** Na górze listy zawsze pojawiają się zlecenia odrzucone przez kontrole jakości.
 - **Zamawianie części:** Technik może zgłosić zapotrzebowanie na części z katalogu. Jeśli część nie była przewidziana przy przyjęciu, jej koszt jest automatycznie doliczany do zlecenia.
 - **Blokada zamykania:** Nie można oznaczyć naprawy jako "Gotowa", dopóki magazyn nie wyda wszystkich zamówionych części.
 
