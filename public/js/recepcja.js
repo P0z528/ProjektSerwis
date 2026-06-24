@@ -20,11 +20,39 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const inputKierunkowy = document.getElementById('input-kierunkowy');
+    const inputTelefon = document.querySelector('input[name="telefon"]');
     const formZlecenie = document.getElementById('form-zlecenie');
 
+    // Walidacja numeru kierunkowego
     if (inputKierunkowy) {
+        // Jeśli pole przy ładowaniu nie ma plusa, od razu go wstawiamy
+        if (!inputKierunkowy.value.startsWith('+')) {
+            inputKierunkowy.value = '+' + inputKierunkowy.value.replace(/[^0-9]/g, '');
+        }
+
+        inputKierunkowy.addEventListener('input', function() {
+            // 1. Zostawiamy w wartości tylko i wyłącznie cyfry
+            let sameCyfry = this.value.replace(/[^0-9]/g, '');
+
+            // 2. Sklejamy od nowa: niezdejmowalny '+' i ucięte cyfry (max 3, bo z plusem daje to 4 znaki)
+            this.value = '+' + sameCyfry.substring(0, 3);
+        });
+
+        // Gdy użytkownik opuści pole
         inputKierunkowy.addEventListener('blur', function () {
-            this.value = normalizujKierunkowy(this.value);
+            // Jeśli użytkownik usunął cyfry i zostawił samego plusa, wracamy do +48
+            if (this.value === '+') {
+                this.value = '+48';
+            } else {
+                this.value = normalizujKierunkowy(this.value);
+            }
+        });
+    }
+
+    // Walidacja numeru telefonu (bez zmian - wycina litery)
+    if (inputTelefon) {
+        inputTelefon.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
         });
     }
 
@@ -100,7 +128,7 @@ document.addEventListener("DOMContentLoaded", function () {
     selectModel.addEventListener("change", function () {
         const model = this.value;
         if (!model) {
-            kontenerCzesci.innerHTML = '<p class="text-muted small m-0 ps-2">Wybierz model urządzenia...</p>';
+            kontenerCzesci.innerHTML = '<div class="col-12"><p class="text-muted small m-0 ps-2">Wybierz model urządzenia...</p></div>';
             przeliczKoszty();
             return;
         }
@@ -110,7 +138,7 @@ document.addEventListener("DOMContentLoaded", function () {
             .then(data => {
                 kontenerCzesci.innerHTML = "";
                 if(data.length === 0) {
-                    kontenerCzesci.innerHTML = '<p class="text-muted small m-0 ps-2">Brak zdefiniowanych części dla tego modelu.</p>';
+                    kontenerCzesci.innerHTML = '<div class="col-12"><p class="text-muted small m-0 ps-2">Brak zdefiniowanych części dla tego modelu.</p></div>';
                     przeliczKoszty();
                     return;
                 }
@@ -118,26 +146,53 @@ document.addEventListener("DOMContentLoaded", function () {
                 // Odczytujemy tablicę wcześniej zaznaczonych usług/części
                 const oldCzesci = JSON.parse(kontenerCzesci.getAttribute('data-old') || '[]');
 
-                data.forEach((item, index) => {
-                    const checked = oldCzesci.includes(item.nazwa_czesci) ? 'checked' : '';
-                    kontenerCzesci.innerHTML += `
-                        <div class="col-md-6 mb-2">
-                            <div class="form-check">
-                                <input class="form-check-input czesc-checkbox" type="checkbox" name="czesci[]" value="${item.nazwa_czesci}" data-cena="${item.cena}" id="chk-${index}" ${checked}>
-                                <label class="form-check-input-label small" for="chk-${index}">
-                                    ${item.nazwa_czesci} (${parseFloat(item.cena).toFixed(2)} PLN)
-                                </label>
+                // Filtrowanie zwróconych danych
+                const czesci = data.filter(item => item.typ === 'Część');
+                const uslugi = data.filter(item => item.typ === 'Usługa');
+
+                let html = '';
+                let index = 0; // globalny licznik dla unikalnych atrybutów "id" i "for"
+
+                // Funkcja pomocnicza generująca HTML dla checkboxów
+                const dodajCheckboxy = (lista) => {
+                    lista.forEach(item => {
+                        const checked = oldCzesci.includes(item.nazwa_czesci) ? 'checked' : '';
+                        html += `
+                            <div class="col-md-6 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input czesc-checkbox" type="checkbox" name="czesci[]" value="${escapeHtml(item.nazwa_czesci)}" data-cena="${item.cena}" id="chk-poz-${index}" ${checked}>
+                                    <label class="form-check-input-label small" for="chk-poz-${index}">
+                                        ${escapeHtml(item.nazwa_czesci)} (${parseFloat(item.cena).toFixed(2)} PLN)
+                                    </label>
+                                </div>
                             </div>
-                        </div>
-                    `;
-                });
+                        `;
+                        index++;
+                    });
+                };
+
+                // Dodawanie bloku "Części sprzętowe"
+                if (czesci.length > 0) {
+                    html += '<div class="col-12"><h6 class="fw-bold small text-muted mb-2 mt-1 border-bottom pb-1" style="color: #6b7280 !important;">Części sprzętowe</h6></div>';
+                    dodajCheckboxy(czesci);
+                }
+
+                // Dodawanie bloku "Usługi serwisowe"
+                if (uslugi.length > 0) {
+                    // Dodatkowy margines górny, jeśli wcześniej wyświetliliśmy części
+                    const mt = czesci.length > 0 ? 'mt-3' : 'mt-1';
+                    html += `<div class="col-12"><h6 class="fw-bold small text-muted mb-2 ${mt} border-bottom pb-1" style="color: #6b7280 !important;">Usługi serwisowe</h6></div>`;
+                    dodajCheckboxy(uslugi);
+                }
+
+                kontenerCzesci.innerHTML = html;
 
                 // Podpięcie nasłuchiwania zmian pod nowo wygenerowane checkboxy
                 document.querySelectorAll(".czesc-checkbox").forEach(cb => {
                     cb.addEventListener("change", przeliczKoszty);
                 });
 
-                // Przelicz koszty na starcie (wykryje przywrócone checkboxy)
+                // Przelicz koszty na starcie (wykryje przywrócone checkboxy po błędnej walidacji)
                 przeliczKoszty();
             });
     });
@@ -154,6 +209,17 @@ document.addEventListener("DOMContentLoaded", function () {
     // 4. Resetowanie kosztów po wyczyszczeniu formularza
     btnOdrzuc.addEventListener("click", function() {
         // 1. Twarde czyszczenie wpisanych wartości
+        if (typeof dataTransferZdjecia !== 'undefined') {
+            dataTransferZdjecia = new DataTransfer();
+            const inputZdjeciaUkryty = document.getElementById('input-zdjecia-ukryty');
+            const zdjeciaLista = document.getElementById('zdjecia-lista');
+            const btnDodaj = document.getElementById('btn-dodaj-zdjecie');
+
+            if (inputZdjeciaUkryty) inputZdjeciaUkryty.files = dataTransferZdjecia.files;
+            if (zdjeciaLista) zdjeciaLista.innerHTML = '';
+            if (btnDodaj) btnDodaj.querySelector('span').innerText = "+ Dodaj zdjęcie";
+        }
+
         document.querySelector('input[name="imie"]').value = "";
         document.querySelector('input[name="nazwisko"]').value = "";
         document.querySelector('input[name="telefon"]').value = "";
@@ -307,17 +373,20 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- KOMPRESJA WIELU ZDJĘĆ W TLE ---
-    const inputZdjecia = document.querySelector('input[type="file"][name="zdjecia[]"]');
+   // --- ZARZĄDZANIE ZDJĘCIAMI I KOMPRESJA (Nowy mechanizm) ---
+    const inputZdjeciaUkryty = document.getElementById('input-zdjecia-ukryty');
+    const btnDodajZdjecie = document.getElementById('btn-dodaj-zdjecie');
+    const zdjeciaLista = document.getElementById('zdjecia-lista');
+
+    // Globalny obiekt przetrzymujący dodane zdjęcia
+    let dataTransferZdjecia = new DataTransfer();
 
     function kompresujPlik(file) {
         return new Promise((resolve) => {
-            // Pliki <= 2MB lub nieobrazkowe puszczamy bez zmian
             if (!file.type.startsWith('image/') || file.size <= 2 * 1024 * 1024) {
                 resolve(file);
                 return;
             }
-
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = function(e) {
@@ -353,20 +422,91 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    if (inputZdjecia) {
-        inputZdjecia.addEventListener('change', async function(event) {
-            const files = Array.from(event.target.files);
-            if (files.length === 0) return;
+    if (btnDodajZdjecie && inputZdjeciaUkryty) {
+        btnDodajZdjecie.addEventListener('click', () => {
+            // Tworzymy tymczasowy input, aby nie nadpisywać starych wyborów
+            const tempInput = document.createElement('input');
+            tempInput.type = 'file';
+            tempInput.multiple = true;
+            tempInput.accept = 'image/png, image/jpeg, image/jpg, image/webp';
 
-            // Jeśli żaden plik nie wymaga kompresji, nic nie robimy
-            if (!files.some(f => f.size > 2 * 1024 * 1024)) return;
+            tempInput.addEventListener('change', async function(e) {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
 
-            const skompresowane = await Promise.all(files.map(kompresujPlik));
+                // Animacja ładowania
+                const spanTekst = btnDodajZdjecie.querySelector('span');
+                const originalText = spanTekst.innerText;
+                spanTekst.innerHTML = '<div class="spinner-border spinner-border-sm"></div>';
+                btnDodajZdjecie.disabled = true;
 
-            const dataTransfer = new DataTransfer();
-            skompresowane.forEach(f => dataTransfer.items.add(f));
-            inputZdjecia.files = dataTransfer.files;
+                // Kompresujemy i wrzucamy do głównego worka
+                const skompresowane = await Promise.all(files.map(kompresujPlik));
+                skompresowane.forEach(file => {
+                    dataTransferZdjecia.items.add(file);
+                });
+
+                // Podpinamy work do ukrytego formularza wysyłki
+                inputZdjeciaUkryty.files = dataTransferZdjecia.files;
+                renderujPodgladZdjec();
+
+                btnDodajZdjecie.disabled = false;
+            });
+
+            tempInput.click();
         });
+    }
+
+    function renderujPodgladZdjec() {
+        if (!zdjeciaLista) return;
+        zdjeciaLista.innerHTML = '';
+
+        Array.from(dataTransferZdjecia.files).forEach((file, index) => {
+            const reader = new FileReader();
+
+            const element = document.createElement('div');
+            element.className = 'position-relative border rounded overflow-hidden bg-light shadow-sm';
+            element.style.width = '70px';
+            element.style.height = '70px';
+
+            const img = document.createElement('img');
+            img.style.objectFit = 'cover';
+            img.style.width = '100%';
+            img.style.height = '100%';
+
+            const btnUsun = document.createElement('button');
+            btnUsun.type = 'button';
+            btnUsun.className = 'btn btn-danger btn-sm position-absolute top-0 end-0 p-0 d-flex align-items-center justify-content-center rounded-circle m-1';
+            btnUsun.style.width = '20px';
+            btnUsun.style.height = '20px';
+            btnUsun.style.fontSize = '12px';
+            btnUsun.innerHTML = '&times;'; // Znak 'X'
+
+            // Logika usuwania pojedynczego zdjęcia
+            btnUsun.onclick = function() {
+                const nowePliki = new DataTransfer();
+                Array.from(dataTransferZdjecia.files).forEach((f, i) => {
+                    if (i !== index) nowePliki.items.add(f);
+                });
+                dataTransferZdjecia = nowePliki;
+                inputZdjeciaUkryty.files = dataTransferZdjecia.files;
+                renderujPodgladZdjec();
+            };
+
+            reader.onload = function(e) {
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+
+            element.appendChild(img);
+            element.appendChild(btnUsun);
+            zdjeciaLista.appendChild(element);
+        });
+
+        // Zmiana tekstu przycisku w zależności od liczby zdjęć
+        if (btnDodajZdjecie) {
+            btnDodajZdjecie.querySelector('span').innerText = dataTransferZdjecia.files.length > 0 ? "+ Kolejne zdjęcie" : "+ Dodaj zdjęcie";
+        }
     }
 
     // --- MODAL POTWIERDZENIA ZLECENIA (po dodaniu nowego zlecenia) ---

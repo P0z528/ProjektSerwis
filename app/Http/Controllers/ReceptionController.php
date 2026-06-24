@@ -57,7 +57,7 @@ class ReceptionController
         $czesci = DB::table('CzesciKatalog as c')
             ->join('ModeleApple as m', 'c.id_modelu', '=', 'm.id')
             ->where('m.model', $model)
-            ->select('c.nazwa_czesci', 'c.cena')
+            ->select('c.nazwa_czesci', 'c.cena', 'c.typ')
             ->get();
         return response()->json($czesci);
     }

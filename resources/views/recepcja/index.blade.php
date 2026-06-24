@@ -65,23 +65,29 @@
                                 <form action="{{ route('recepcja.storeOrder') }}" method="POST" id="form-zlecenie" enctype="multipart/form-data">
                                     @csrf
                                     <h6 class="fw-bold mb-3">Dane klienta</h6>
-                                    <div class="row mb-4">
-                                        <div class="col-md-4">
+
+                                    <!-- Pierwsza linia: Imię i Nazwisko -->
+                                    <div class="row mb-3">
+                                        <div class="col-md-6 mb-3 mb-md-0">
                                             <label class="small text-muted mb-1">Imię</label>
                                             <input type="text" name="imie" maxlength="26" class="form-control bg-light border-0 @error('imie') is-invalid @enderror" value="{{ old('imie') }}" required>
                                             @error('imie') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-6">
                                             <label class="small text-muted mb-1">Nazwisko</label>
                                             <input type="text" name="nazwisko" maxlength="26" class="form-control bg-light border-0 @error('nazwisko') is-invalid @enderror" value="{{ old('nazwisko') }}" required>
                                             @error('nazwisko') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
                                         </div>
-                                        <div class="col-md-2">
+                                    </div>
+
+                                    <!-- Druga linia: Telefon -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-4 mb-3 mb-md-0">
                                             <label class="small text-muted mb-1">Numer kierunkowy</label>
                                             <input type="text" name="kierunkowy" id="input-kierunkowy" maxlength="4" class="form-control bg-light border-0 @error('kierunkowy') is-invalid @enderror" placeholder="+48" value="{{ old('kierunkowy', '+48') }}">
                                             @error('kierunkowy') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
                                         </div>
-                                        <div class="col-md-2">
+                                        <div class="col-md-8">
                                             <label class="small text-muted mb-1">Numer telefonu</label>
                                             <input type="text" name="telefon" class="form-control bg-light border-0 @error('telefon') is-invalid @enderror" placeholder="600100200" value="{{ old('telefon') }}" required>
                                             @error('telefon') <div class="text-danger extra-small" style="font-size: 11px;">{{ $message }}</div> @enderror
@@ -118,9 +124,20 @@
                                             </select>
                                             @error('data_naprawy') <div class="text-danger extra-small mt-1" style="font-size: 11px;">{{ $message }}</div> @enderror
                                         </div>
-                                        <div class="col-md-6 mt-3">
-                                            <label class="small text-muted mb-1">Zdjęcia sprzętu przed naprawą (można wybrać wiele)</label>
-                                            <input type="file" name="zdjecia[]" multiple class="form-control bg-light border-0 @error('zdjecia.*') is-invalid @enderror" accept="image/png, image/jpeg, image/jpg, image/webp">
+
+                                        <div class="col-12 mt-4">
+                                            <label class="small text-muted mb-2">Zdjęcia sprzętu przed naprawą (opcjonalne)</label>
+
+                                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                                <div id="zdjecia-lista" class="d-flex flex-wrap gap-2"></div>
+
+                                                <input type="file" name="zdjecia[]" id="input-zdjecia-ukryty" multiple accept="image/png, image/jpeg, image/jpg, image/webp" class="d-none @error('zdjecia.*') is-invalid @enderror">
+
+                                                <button type="button" id="btn-dodaj-zdjecie" class="btn btn-outline-secondary d-flex align-items-center justify-content-center" style="height: 70px; width: 140px; border-style: dashed; border-width: 2px;">
+                                                    <span class="small fw-bold">+ Dodaj zdjęcie</span>
+                                                </button>
+                                            </div>
+
                                             @error('zdjecia.*')
                                                 <div class="text-danger extra-small mt-1" style="font-size: 11px;">
                                                     Błąd zdjęcia: {{ $message }}
