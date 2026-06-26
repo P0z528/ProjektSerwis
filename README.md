@@ -234,7 +234,7 @@ Interfejs został zbudowany w oparciu o framework **Bootstrap 5**, co zapewnia p
 Poniższe zrzuty wykonano w rozdzielczości **1280x720 px**, dokumentując poprawne skalowanie poszczególnych modułów na mniejszych ekranach:
 
 ![Logowanie w rozdzielczości 1280x720](docs/images/Login_r.png)
-*Rysunek 13. Ekran logowania w rozdzielczości 1280x720 - formularz i kalendarz dostępności zachowują czytelność i proporcje na węższym ekranie.*
+*Rysunek 13. Ekran logowania w rozdzielczości 1280x720 - formularz i kalendarz dostępności zachowują czytelność na węższym ekranie.*
 
 ![Recepcja w rozdzielczości 1280x720](docs/images/recepcja_r.png)
 *Rysunek 14. Panel recepcji w widoku 1280x720 - formularz przyjęcia zlecenia i podsumowanie kosztów przestawiają się do układu kolumnowego bez utraty funkcjonalności.*
@@ -252,7 +252,7 @@ Poniższe zrzuty wykonano w rozdzielczości **1280x720 px**, dokumentując popra
 
 ### 5. Zaawansowane mechanizmy biznesowe
 
-- **Mechanizm wycofania zlecenia (Odrzucenie kosztów):** Jeśli podczas wydawania sprzętu klient nie zaakceptuje zwiększonych kosztów (wynikających z dodatkowych części zamówionych przez technika), recepcja klika "Odrzuca". Zlecenie natychmiast wraca do TEGO SAMEGO technika jako **priorytet** w celu wymontowania nowej części i przywrócenia stanu pierwotnego.
+- **Mechanizm wycofania zlecenia (Odrzucenie kosztów):** Jeśli podczas wydawania sprzętu klient nie zaakceptuje zwiększonych kosztów (wynikających z dodatkowych części zamówionych przez technika), recepcja klika "Odrzuca". Zlecenie natychmiast wraca do tego samego technika jako **priorytet** w celu wymontowania nowej części i przywrócenia stanu pierwotnego.
 - **Sieroca Pula:** W przypadku usunięcia konta technika lub zmiany jego roli na inną, wszystkie jego aktywne zlecenia automatycznie tracą przypisanie i wracają do puli głównej (status "W kolejce"), aby inni pracownicy mogli je przejąć.
 - **Bezpieczeństwo danych i obrazów:** 
   - Zdjęcia dokumentujące stan sprzętu są **kompresowane w przeglądarce** (JS Canvas) przed wysyłką na serwer, co oszczędza transfer i miejsce na dysku.

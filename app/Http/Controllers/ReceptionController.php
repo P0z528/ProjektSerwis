@@ -111,7 +111,7 @@ class ReceptionController
             }
         }
 
-        // Dane wybranych części/usług (potrzebne też do wydruku) - liczone raz, przed transakcją
+        // Dane wybranych części/usług (potrzebne też do wydruku)
         $czesciDane = DB::table('CzesciKatalog as ck')
             ->join('ModeleApple as m', 'ck.id_modelu', '=', 'm.id')
             ->where('m.model', $validated['model'])
@@ -185,7 +185,7 @@ class ReceptionController
 
     /**
      * Buduje treść szablonu zlecenia i zapisuje go jako plik .txt
-     * w storage/app/public/wydruki/Zlecenie_{ID}.txt
+     * w storage/app/public/wydruki/Nazwisko_Model_ID.txt
      */
     private function zapiszWydrukZlecenia(int $id, array $dane): void
     {
@@ -250,7 +250,7 @@ class ReceptionController
         $nazwaPliku = $zlecenie->nazwisko . '_' . $modelBezSpacji . '_' . $id . '.txt';
         $sciezka = 'wydruki/' . $nazwaPliku;
 
-        // Jeśli plik o takiej nazwie NIE istnieje (np. wpadł z Seedera)
+        // Jeśli plik o takiej nazwie nie istnieje (np. wpadł z Seedera)
         if (!Storage::disk('public')->exists($sciezka)) {
 
             // Generujemy treść dokumentu

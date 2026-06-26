@@ -89,7 +89,7 @@ class TechnicianController
             ->unique()
             ->flip();
 
-        // Eager loading: wszystkie części/usługi zgłoszone do zlecenia (również dodatkowe,
+        // wszystkie części/usługi zgłoszone do zlecenia (również dodatkowe,
         // dołożone przez technika poza pierwotną diagnozą) wraz z ich statusem wydania.
         $czesciZlecen = DB::table('Zapotrzebowania as z')
             ->join('CzesciKatalog as ck', 'z.id_czesci_katalog', '=', 'ck.id')
@@ -285,5 +285,5 @@ class TechnicianController
 
         return response()->json(['count' => $noweZlecenia]);
     }
-    
+
 }
