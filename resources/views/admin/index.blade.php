@@ -592,4 +592,39 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 </script>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+    <div id="updateToastAdmin" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
+        <div class="d-flex">
+            <div class="toast-body">
+                <strong>Aktualizacja!</strong> Nowy sprzęt czeka na Kontrolę Jakości.
+                <button type="button" class="btn btn-light btn-sm ms-2 mt-2 w-100" onclick="window.location.reload();">Odśwież stronę</button>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Pobiera ilość zleceń w statusie "Do kontroli" z głównego zapytania w kontrolerze
+    let currentCount = {{ $doKontroli->count() ?? 0 }};
+
+    setInterval(() => {
+        fetch('/api/admin/check-updates')
+            .then(response => response.json())
+            .then(data => {
+                if (data.count > currentCount) {
+                    const toastEl = document.getElementById('updateToastAdmin');
+                    const toast = new bootstrap.Toast(toastEl);
+                    toast.show();
+                    currentCount = data.count;
+                } else if (data.count < currentCount) {
+                    currentCount = data.count;
+                }
+            })
+            .catch(err => console.error(err));
+    }, 10000);
+});
+</script>
 @endsection

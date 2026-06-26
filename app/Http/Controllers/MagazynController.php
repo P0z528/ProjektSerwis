@@ -39,7 +39,7 @@ class MagazynController
         // Typy urządzeń do formularza ręcznego
         $typy = DB::table('ModeleApple')->distinct()->pluck('typ');
 
-        // KPI
+        // Karty statystyk
         $kpiZap = $zapotrzebowania->count();
         $kpiZakupy = $zakupy->count();
         $kpiStan = $stany->count();
@@ -61,7 +61,7 @@ class MagazynController
         // Ile sztuk danej części katalogowej chcemy łącznie wydać w tej operacji
         $wymaganeIlosci = $zapotrzebowania->groupBy('id_czesci_katalog')->map->count();
 
-        // --- TWARDA WALIDACJA STANU MAGAZYNOWEGO (przed jakąkolwiek zmianą) ---
+        // WALIDACJA STANU MAGAZYNOWEGO
         // Jeśli choć jednej części brakuje lub jest jej mniej niż żądana ilość, blokujemy całą operację.
         foreach ($wymaganeIlosci as $idCzesciKatalog => $potrzeba) {
             $stan = (int) (DB::table('Czesci')->where('id_czesci_katalog', $idCzesciKatalog)->value('ilosc') ?? 0);
@@ -70,12 +70,12 @@ class MagazynController
             }
         }
 
-        // Stan wystarczający dla wszystkich pozycji — wykonujemy wydanie.
+        // Stan wystarczający dla wszystkich pozycji - wykonujemy wydanie.
         DB::transaction(function () use ($zapotrzebowania) {
             foreach ($zapotrzebowania as $zap) {
                 $czesc = DB::table('Czesci')->where('id_czesci_katalog', $zap->id_czesci_katalog)->first();
 
-                // Druga linia obrony wewnątrz transakcji (gdyby stan zmienił się równolegle).
+                // Ochrony wewnątrz transakcji gdyby stan zmienił się równolegle.
                 if (!$czesc || $czesc->ilosc <= 0) {
                     throw new \RuntimeException('Stan magazynowy zmienił się w trakcie wydawania.');
                 }
@@ -197,7 +197,7 @@ class MagazynController
         return back()->with('success', 'Zwiększono ilość na liście zakupów.');
     }
 
-    // --- API ---
+    // API
     public function getModele($typ) {
         return response()->json(DB::table('ModeleApple')->where('typ', $typ)->pluck('model'));
     }
@@ -207,5 +207,12 @@ class MagazynController
             ->where('m.model', $model)
             ->pluck('ck.nazwa_czesci');
         return response()->json($czesci);
+    }
+    
+    public function checkUpdates() {
+        // Sprawdza, czy wpadły nowe zapotrzebowania od techników
+        $oczekujace = DB::table('Zapotrzebowania')->where('status', 'Oczekuje')->count();
+
+        return response()->json(['count' => $oczekujace]);
     }
 }

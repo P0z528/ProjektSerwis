@@ -106,7 +106,7 @@ class TechnicianController
             $zl->czesci = $czesciZlecen->get($zl->id, collect());
         }
 
-        // 3. KPI (Statystyki na górze)
+        // 3. Karty statystyk
         $kpiDoPodjecia = $pula->count();
         $kpiAktywne = $moje->count();
         $kpiBrakCzesci = DB::table('Zlecenia')->where('id_technika', $userId)->where('status', 'Czeka na części')->count();
@@ -153,7 +153,7 @@ class TechnicianController
                 return back()->with('error', 'Nie można zakończyć naprawy. Magazyn nie wydał jeszcze wszystkich zamówionych części.');
             }
 
-            // Wysyłka do QA - czyścimy poprzednie odrzucenie i flagę rollback klienta
+            // Wysyłka do kontroli jakości - czyścimy poprzednie odrzucenie i kasujemy informację, że klient odmówił zapłaty za części.
             DB::table('Zlecenia')->where('id', $id)->update([
                 'status' => 'Do kontroli',
                 'powod_odrzucenia' => null,
@@ -165,7 +165,7 @@ class TechnicianController
         return back()->with('warning', 'Nie możesz zakończyć tego zlecenia.');
     }
 
-    // --- LOGIKA DO ZAMAWIANIA CZĘŚCI ---
+    // LOGIKA DO ZAMAWIANIA CZĘŚCI
 
     /**
      * Zwraca fizyczne części dla modelu danego zlecenia i oznacza,
@@ -197,7 +197,7 @@ class TechnicianController
             ->select('ck.id', 'ck.nazwa_czesci', 'ck.cena')
             ->get()
             ->map(function ($c) use ($pierwotne) {
-                // Flaga wyłącznie podpowiedzi — NIE jest wymuszana przy zamawianiu.
+                // System nie wymusza zamawiania tej czesci.
                 $c->sugerowana = in_array($c->nazwa_czesci, $pierwotne);
                 return $c;
             });
@@ -214,12 +214,12 @@ class TechnicianController
 
         $zlecenie = DB::table('Zlecenia')->where('id', $id)->first();
 
-        // --- BLOKADA 2: Zapobieganie podwójnym zamówieniom ---
+        // BLOKADA 2: Zapobieganie podwójnym zamówieniom
         if (in_array($zlecenie->status, ['Czeka na części', 'Części dostępne'])) {
             return back()->with('warning', 'Odrzucono: Części do tego zlecenia zostały już zamówione lub są gotowe do odbioru!');
         }
 
-        // Ustalamy pierwotnie wybrane części (z opisu), aby wykryć części DODATKOWE
+        // Ustalamy pierwotnie wybrane części (z opisu), aby wykryć części dodatkowe
         $pierwotne = [];
         if ($zlecenie->opis_usterki && str_contains($zlecenie->opis_usterki, ':')) {
             $czescOpisu = substr($zlecenie->opis_usterki, strpos($zlecenie->opis_usterki, ':') + 1);
@@ -276,4 +276,14 @@ class TechnicianController
 
         return back()->with('success', 'Zapotrzebowanie zgłoszone do magazynu! Naprawa wstrzymana.');
     }
+
+    public function checkUpdates() {
+        $noweZlecenia = DB::table('Zlecenia')
+            ->whereNull('id_technika')
+            ->whereIn('status', ['W kolejce', 'Przyjęte'])
+            ->count();
+
+        return response()->json(['count' => $noweZlecenia]);
+    }
+    
 }

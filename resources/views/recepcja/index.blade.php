@@ -443,7 +443,7 @@
           </div>
           <div class="modal-footer border-0">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="btn-zamknij-zlecenie">Zamknij</button>
-            <a href="{{ route('recepcja.wydruk', $noweZlecenie['id']) }}" id="btn-wydruk-zlecenie" class="btn text-white fw-bold" style="background-color:#8b5cf6;">Wydrukuj</a>
+            <a href="{{ route('recepcja.wydruk', session('nowe_zlecenie.id')) }}" target="_blank" class="btn btn-primary" onclick="this.classList.add('disabled'); this.innerText='Otwarto do druku...';"> Wydrukuj zlecenie </a>
           </div>
         </div>
       </div>
@@ -453,4 +453,39 @@
 
 @section('scripts')
 <script src="{{ asset('js/recepcja.js') }}"></script>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+    <div id="updateToastRecepcja" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
+        <div class="d-flex">
+            <div class="toast-body">
+                <strong>Aktualizacja!</strong> Sprzęt przeszedł kontrolę i jest gotowy do wydania.
+                <button type="button" class="btn btn-light btn-sm ms-2 mt-2 w-100" onclick="window.location.reload();">Odśwież stronę</button>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Pobiera ilość urządzeń gotowych do wydania z głównego zapytania
+    let currentCount = {{ $gotoweZlecenia->count() ?? 0 }};
+
+    setInterval(() => {
+        fetch('/api/recepcja/check-updates')
+            .then(response => response.json())
+            .then(data => {
+                if (data.count > currentCount) {
+                    const toastEl = document.getElementById('updateToastRecepcja');
+                    const toast = new bootstrap.Toast(toastEl);
+                    toast.show();
+                    currentCount = data.count;
+                } else if (data.count < currentCount) {
+                    currentCount = data.count;
+                }
+            })
+            .catch(err => console.error(err));
+    }, 10000);
+});
+</script>
 @endsection

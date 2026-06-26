@@ -42,7 +42,7 @@ class ReceptionController
             ->select('Z.id', 'K.imie', 'K.nazwisko', 'U.model', 'Z.koszt', 'Z.koszt_pierwotny')
             ->get();
 
-        // Lista klientów do panelu zarządzania (edycja danych) - opcjonalnie dla recepcji
+        // Lista klientów do panelu zarządzania (edycja danych
         return view('recepcja.index', compact('typy', 'gotoweZlecenia'));
     }
 
@@ -217,33 +217,104 @@ class ReceptionController
 
         $tresc = implode("\r\n", $linie);
 
-        Storage::disk('public')->put('wydruki/Zlecenie_' . $id . '.txt', $tresc);
+        // Usuwamy spacje z nazwy modelu
+        $modelBezSpacji = str_replace(' ', '', $dane['model']);
+
+        // Nazwa pliku: Nazwisko_Model_ID.txt
+        $nazwaPliku = $dane['nazwisko'] . '_' . $modelBezSpacji . '_' . $id . '.txt';
+
+        Storage::disk('public')->put('wydruki/' . $nazwaPliku, $tresc);
     }
 
     /**
      * Zwraca zapisany plik wydruku zlecenia do pobrania.
+     * Jeśli plik nie istnieje, generuje go w locie
      */
     public function downloadWydruk($id)
     {
-        $sciezka = 'wydruki/Zlecenie_' . (int) $id . '.txt';
+        // Najpierw pobieramy dane z bazy, bo są nam potrzebne i do wygenerowania nazwy, i treści
+        $zlecenie = DB::table('Zlecenia as Z')
+            ->join('Urzadzenia as U', 'Z.id_urzadzenia', '=', 'U.id')
+            ->join('Klienci as K', 'U.id_klienta', '=', 'K.id')
+            ->leftJoin('ModeleApple as M', 'U.model', '=', 'M.model')
+            ->where('Z.id', $id)
+            ->select('Z.id', 'Z.data_naprawy', 'Z.koszt', 'Z.opis_usterki', 'U.model', 'U.numer_seryjny', 'K.imie', 'K.nazwisko', 'K.telefon', 'M.typ')
+            ->first();
 
-        if (!Storage::disk('public')->exists($sciezka)) {
-            return back()->with('error', 'Nie znaleziono pliku wydruku dla tego zlecenia.');
+        if (!$zlecenie) {
+            return back()->with('error', 'Nie znaleziono takiego zlecenia w bazie danych.');
         }
 
-        return response()->download(
+        // Odtwarzamy Twoją logikę nazewnictwa pliku
+        $modelBezSpacji = str_replace(' ', '', $zlecenie->model);
+        $nazwaPliku = $zlecenie->nazwisko . '_' . $modelBezSpacji . '_' . $id . '.txt';
+        $sciezka = 'wydruki/' . $nazwaPliku;
+
+        // Jeśli plik o takiej nazwie NIE istnieje (np. wpadł z Seedera)
+        if (!Storage::disk('public')->exists($sciezka)) {
+
+            // Generujemy treść dokumentu
+            $linie = [];
+            $linie[] = '====================================';
+            $linie[] = '        ELECTROSERVICE - ZLECENIE';
+            $linie[] = '====================================';
+            $linie[] = 'Numer zlecenia : #' . $zlecenie->id;
+            $linie[] = 'Data przyjęcia : (Odtworzono z systemu)';
+            $linie[] = 'Termin naprawy : ' . $zlecenie->data_naprawy;
+            $linie[] = '------------------------------------';
+            $linie[] = 'KLIENT';
+            $linie[] = '  Imię i nazwisko : ' . $zlecenie->imie . ' ' . $zlecenie->nazwisko;
+            $linie[] = '  Telefon         : ' . $zlecenie->telefon;
+            $linie[] = '------------------------------------';
+            $linie[] = 'URZĄDZENIE';
+            $linie[] = '  Typ          : ' . ($zlecenie->typ ?? 'Brak danych');
+            $linie[] = '  Model        : ' . $zlecenie->model;
+            $linie[] = '  Numer seryjny: ' . $zlecenie->numer_seryjny;
+            $linie[] = '------------------------------------';
+            $linie[] = 'USŁUGI / CZĘŚCI';
+            $linie[] = '  ' . ($zlecenie->opis_usterki ?: 'Brak wprowadzonych usług');
+            $linie[] = '------------------------------------';
+            $linie[] = 'KOSZT CAŁKOWITY : ' . number_format($zlecenie->koszt, 2) . ' PLN';
+            $linie[] = '====================================';
+            $linie[] = 'Dziękujemy za skorzystanie z naszych usług.';
+
+            // Zapisujemy wygenerowany plik na dysk
+            Storage::disk('public')->put($sciezka, implode("\r\n", $linie));
+        }
+
+        // Zwracamy plik do podglądu w przeglądarce zamiast wymuszać pobieranie
+        return response()->file(
             Storage::disk('public')->path($sciezka),
-            'Zlecenie_' . (int) $id . '.txt',
-            ['Content-Type' => 'text/plain; charset=UTF-8']
+            [
+                'Content-Type' => 'text/plain; charset=UTF-8',
+                'Content-Disposition' => 'inline; filename="' . $nazwaPliku . '"'
+            ]
         );
     }
 
     public function storeModel(Request $request) {
-        $typ = $request->input('nowy_typ') === 'Inny' ? $request->input('nowy_typ_manual') : $request->input('nowy_typ');
+        $request->validate([
+            'model' => 'required|string|max:255',
+            'nowy_typ' => 'required',
+            'nowy_typ_manual' => 'required_if:nowy_typ,Inny|nullable|string|max:255'
+        ]);
+
+        $typ = $request->input('nowy_typ') === 'Inny' ? trim($request->input('nowy_typ_manual')) : $request->input('nowy_typ');
+        $nazwaModelu = trim($request->input('model'));
+
+        // Zabezpieczenie przed duplikatem modelu
+        $istnieje = DB::table('ModeleApple')
+            ->where('typ', $typ)
+            ->whereRaw('LOWER(model) = ?', [mb_strtolower($nazwaModelu, 'UTF-8')])
+            ->exists();
+
+        if ($istnieje) {
+            return back()->with('error', 'Model "' . $nazwaModelu . '" już istnieje w katalogu dla typu ' . $typ . '!');
+        }
 
         DB::table('ModeleApple')->insert([
             'typ' => $typ,
-            'model' => $request->input('model')
+            'model' => $nazwaModelu
         ]);
 
         return back()->with('success', 'Dodano nowy model do katalogu!');
@@ -447,5 +518,10 @@ class ReceptionController
         }
 
         return response()->json(['success' => false, 'message' => 'Brak wyników. Sprawdź numer zlecenia oraz numer seryjny.']);
+    }
+
+    public function checkUpdates() {
+        $gotowe = DB::table('Zlecenia')->where('status', 'Gotowe')->count();
+        return response()->json(['count' => $gotowe]);
     }
 }

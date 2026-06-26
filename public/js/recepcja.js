@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return str.replace(/"/g, '&quot;');
     }
 
-    // --- NORMALIZACJA NUMERU KIERUNKOWEGO ---
+    // NORMALIZACJA NUMERU KIERUNKOWEGO
     function normalizujKierunkowy(wartosc) {
         let k = (wartosc || '').replace(/\s/g, '').trim();
         if (k === '') return '+48';
@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- OBSŁUGA ZAKŁADEK I ZAPAMIĘTYWANIE (LOCAL STORAGE) ---
+    // OBSŁUGA ZAKŁADEK I ZAPAMIĘTYWANIE (LOCAL STORAGE)
     const tabButtons = document.querySelectorAll('#v-pills-tab button');
 
     // 1. Zapisywanie wyboru po kliknięciu
@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // --- OBSŁUGA ZAKŁADKI OBSŁUGA (Dynamiczne ładowanie modeli i części) ---
+    // OBSŁUGA ZAKŁADKI OBSŁUGA (Dynamiczne ładowanie modeli i części)
 
     // 1. Wybór typu -> Pobierz modele przez fetch API
     selectTyp.addEventListener("change", function () {
@@ -245,7 +245,7 @@ document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll('.text-danger').forEach(el => el.remove());
     });
 
-    // --- ŁADOWANIE WOLNYCH TERMINÓW NAPRAWY ---
+    // ŁADOWANIE WOLNYCH TERMINÓW NAPRAWY
     const selectTermin = document.getElementById("select-termin");
     if (selectTermin) {
         const oldTermin = selectTermin.getAttribute('data-old');
@@ -267,7 +267,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
     }
 
-    // --- INICJALIZACJA PO ODŚWIEŻENIU STRONY ---
+    // INICJALIZACJA PO ODŚWIEŻENIU STRONY
     // Jeśli po powrocie z walidacji typ jest już wybrany, sztucznie wywołujemy zdarzenie zmiany, aby załadować resztę struktur
     if (selectTyp.value) {
         selectTyp.dispatchEvent(new Event('change'));
@@ -286,7 +286,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     }
-    // --- OBSŁUGA ZAKŁADKI KATALOG (Dodawanie Części) ---
+    // OBSŁUGA ZAKŁADKI KATALOG (Dodawanie Części)
     const selectKatalogTypCzesc = document.getElementById("select-katalog-typ-czesc");
     const selectKatalogModelCzesc = document.getElementById("select-katalog-model-czesc");
 
@@ -323,7 +323,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // --- SPRAWDZANIE STATUSU ZLECENIA ---
+    // SPRAWDZANIE STATUSU ZLECENIA
     const btnCheckStatus = document.getElementById('btn-check-status');
     const inputZlecenie = document.getElementById('status-zlecenie');
     const inputNumerSeryjny = document.getElementById('status-numer-seryjny');
@@ -373,7 +373,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-   // --- ZARZĄDZANIE ZDJĘCIAMI I KOMPRESJA (Nowy mechanizm) ---
+   // ZARZĄDZANIE ZDJĘCIAMI I KOMPRESJA (Nowy mechanizm)
     const inputZdjeciaUkryty = document.getElementById('input-zdjecia-ukryty');
     const btnDodajZdjecie = document.getElementById('btn-dodaj-zdjecie');
     const zdjeciaLista = document.getElementById('zdjecia-lista');
@@ -509,7 +509,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // --- MODAL POTWIERDZENIA ZLECENIA (po dodaniu nowego zlecenia) ---
+    // MODAL POTWIERDZENIA ZLECENIA (po dodaniu nowego zlecenia)
     const zlecenieModalEl = document.getElementById('zlecenieModal');
     if (zlecenieModalEl) {
         let wydrukKlikniety = false;
@@ -537,7 +537,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- EDYCJA / USUWANIE POZYCJI CENNIKA ---
+    // EDYCJA / USUWANIE POZYCJI CENNIKA
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const editTyp = document.getElementById('edit-katalog-typ');
     const editModel = document.getElementById('edit-katalog-model');

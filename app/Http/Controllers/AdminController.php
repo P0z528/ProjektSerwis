@@ -34,7 +34,7 @@ class AdminController
     }
 
     public function index() {
-        // 1. Karty KPI
+        // 1. Karty statystyk
         $aktywne = DB::table('Zlecenia')->where('status', '!=', 'Wydane')->count();
         $wNaprawie = DB::table('Zlecenia')->where('status', 'W naprawie')->count();
         $doWydania = DB::table('Zlecenia')->whereIn('status', ['Gotowe', 'Do wydania'])->count();
@@ -74,7 +74,7 @@ class AdminController
             ->where('Z.status', 'Do kontroli')
             ->get();
 
-        // Eager loading: wszystkie części/usługi przypisane do zleceń w kontroli jakości,
+        // wszystkie części/usługi przypisane do zleceń w kontroli jakości,
         // łącznie z pozycjami dodanymi wtórnie przez technika (dodatkowa = true).
         $czesciKontroli = DB::table('Zapotrzebowania as z')
             ->join('CzesciKatalog as ck', 'z.id_czesci_katalog', '=', 'ck.id')
@@ -156,7 +156,7 @@ class AdminController
         $request->validate([
             'imie' => 'required|string|max:255',
             'nazwisko' => 'required|string|max:255',
-            'telefon' => 'nullable|string|max:30',
+            'telefon' => ['nullable', 'string', 'regex:/^\+?[0-9]{9,15}$/'],
             'id_zlecenia' => 'nullable|integer|exists:Zlecenia,id',
             'status' => ['nullable', Rule::in(self::STATUSY_ZLECEN)],
         ]);
@@ -215,7 +215,7 @@ class AdminController
         return back()->with('success', 'Zlecenie i powiązane dane zostały usunięte.');
     }
 
-    // --- ZARZĄDZANIE PRACOWNIKAMI ---
+    // ZARZĄDZANIE PRACOWNIKAMI
     public function storeEmployee(Request $request) {
         $request->validate([
             'login' => 'required|string|max:255|unique:Uzytkownicy,login',
@@ -246,7 +246,7 @@ class AdminController
             return back()->with('error', 'Nie znaleziono pracownika.');
         }
 
-        // ŻELAZNA ZASADA: nie można zmienić roli ostatniej osoby na danym stanowisku
+        // nie można zmienić roli ostatniej osoby na danym stanowisku
         if ($pracownik->rola !== $request->rola && $this->czyOstatniWRoli($pracownik->rola)) {
             return back()->with('error', 'Nie można zmienić roli ostatniego pracownika w tej roli.');
         }
@@ -282,7 +282,7 @@ class AdminController
             return back()->with('error', 'Nie znaleziono pracownika.');
         }
 
-        // ŻELAZNA ZASADA: w systemie musi pozostać min. 1 osoba w każdej roli
+        // Zasada że w systemie musi pozostać min. 1 osoba w każdej roli
         if ($this->czyOstatniWRoli($pracownik->rola)) {
             return back()->with('error', 'Nie można usunąć ostatniego pracownika w tej roli.');
         }
@@ -306,5 +306,9 @@ class AdminController
             : 'Pracownik został usunięty.';
 
         return back()->with('success', $info);
+    }
+    public function checkUpdates() {
+        $doKontroli = DB::table('Zlecenia')->where('status', 'Do kontroli')->count();
+        return response()->json(['count' => $doKontroli]);
     }
 }

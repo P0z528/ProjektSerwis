@@ -76,4 +76,10 @@ Route::middleware(['auth'])->group(function () {
     // Dynamiczne API dla JavaScriptu (zastępuje zapytania SQL w locie z Pythona)
     Route::get('/api/modele/{typ}', [ReceptionController::class, 'getModelsByType']);
     Route::get('/api/czesci/{model}', [ReceptionController::class, 'getPartsByModel']);
+
+    // API do powiadomień w tle
+    Route::get('/api/technik/check-updates', [TechnicianController::class, 'checkUpdates']);
+    Route::get('/api/magazyn/check-updates', [MagazynController::class, 'checkUpdates']);
+    Route::get('/api/admin/check-updates', [AdminController::class, 'checkUpdates']);
+    Route::get('/api/recepcja/check-updates', [ReceptionController::class, 'checkUpdates']);
 });
